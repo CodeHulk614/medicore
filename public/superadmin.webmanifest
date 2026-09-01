@@ -1,0 +1,10 @@
+{
+  "id": "/superadmin.html", "name": "MediCore HQ", "short_name": "MediCore HQ",
+  "start_url": "/superadmin.html", "scope": "/", "display": "standalone", "orientation": "portrait",
+  "background_color": "#0C2A2E", "theme_color": "#0C2A2E",
+  "icons": [
+    {"src":"/icons/hq-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/icons/hq-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"/icons/hq-maskable-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
+  ]
+}

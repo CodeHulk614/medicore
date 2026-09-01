@@ -343,6 +343,7 @@ input{font-family:inherit}
 <script src="/clockkit.js"></script>
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
+<script src="/plangate.js"></script>
 <script>
 'use strict';
 const I = {
@@ -392,7 +393,7 @@ function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentEl
 
 let DATA={};
 TABS=[{id:'home',lab:'Today',ic:I.home},{id:'queue',lab:'Dispense',ic:I.pill},{id:'stock',lab:'Inventory',ic:I.box},{id:'me',lab:'Me',ic:I.user}];
-async function boot(){ try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'pharmacy',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
+async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'pharmacy'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'pharmacy',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
 async function load(){ const [ov,q,inv]=await Promise.all([api('/api/pharm/overview'),api('/api/pharm/queue'),api('/api/pharm/inventory')]); DATA={ov,queue:(q.active||[]),done:(q.done||[]),inv}; }
 SCREENS.home={ body(){ const o=DATA.ov;
   return `<div class="greeting"><div class="hello">${o.facility}.</div><div class="sub">Pharmacy console</div></div>

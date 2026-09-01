@@ -345,6 +345,7 @@ input{font-family:inherit}
 <script src="/clockkit.js"></script>
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
+<script src="/plangate.js"></script>
 <script>
 'use strict';
 const I = {
@@ -395,7 +396,7 @@ function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentEl
 
 let DATA={cases:[],responders:[],hospitals:[],bounds:{latMin:6.42,latMax:6.63,lngMin:3.31,lngMax:3.56}};
 TABS=[{id:'board',lab:'Board',ic:I.siren},{id:'fleet',lab:'Fleet',ic:I.truck},{id:'me',lab:'Me',ic:I.user}];
-async function boot(){ try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'dispatch',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
+async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'ambulance'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'dispatch',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
 async function load(){ const b=await api('/api/dispatch/board'); DATA={cases:b.cases||[],responders:b.units||[],hospitals:b.hospitals||[],bounds:b.bounds,recent:b.recent||[],hospitalName:b.hospitalName,stats:b.stats||null,deliveries:b.deliveries||[]}; }
 headerExtra=()=>`<button class="tb-btn" onclick="logCall()" title="Log call">${svg(I.plus,20)}</button>`;
 const CST={requested:['gold','New'],assigned:['teal','Assigned'],enroute:['teal','En route'],onscene:['coral','On scene'],transporting:['coral','Transporting'],arrived:['teal','At hospital'],closed:['grey','Closed']};

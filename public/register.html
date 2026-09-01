@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0C2A2E">
+<title>MediCore — bring your hospital onboard</title>
+<style>
+:root{--ink:#0C2A2E;--muted:#5a6d6d;--line:#E1EAEA;--teal:#15707A;--gold:#E9B23C}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--ink);background:#EDF2F2}
+.hero{background:linear-gradient(160deg,#0C2A2E,#15707A);color:#fff;padding:44px 20px 60px;text-align:center}
+.hero h1{font-size:2rem;margin:0 0 8px} .hero p{opacity:.9;max-width:620px;margin:0 auto;font-size:1.02rem;line-height:1.5}
+.wrap{max-width:1000px;margin:-34px auto 60px;padding:0 16px}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.tier{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 8px 22px rgba(12,42,46,.08);cursor:pointer;transition:transform .12s,border-color .12s}
+.tier:hover{transform:translateY(-3px)} .tier.sel{border-color:var(--teal);box-shadow:0 8px 26px rgba(21,112,122,.25)}
+.tier h3{margin:0 0 2px;font-size:1.1rem} .price{font-size:1.5rem;font-weight:800;color:var(--teal);margin:6px 0}
+.blurb{color:var(--muted);font-size:.85rem;min-height:34px}
+.apps{list-style:none;padding:0;margin:10px 0 0}
+.apps li{font-size:.82rem;padding:3px 0;color:#33474 7} .apps li::before{content:"\2713  ";color:var(--teal);font-weight:800}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:22px;box-shadow:0 8px 22px rgba(12,42,46,.06)}
+label{font-size:.78rem;color:var(--muted);font-weight:700;display:block;margin:10px 0 4px}
+input,select{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{width:100%;font:inherit;font-weight:800;background:var(--teal);color:#fff;border:none;border-radius:12px;padding:14px;margin-top:16px;cursor:pointer;font-size:1rem}
+.msg{margin-top:14px;font-size:.9rem} .ok{color:#0d7a5f} .err{color:#b4402a}
+.done{background:#DBF4EC;border:1px solid #bfe9db;border-radius:14px;padding:18px;margin-top:16px}
+.foot{text-align:center;color:var(--muted);font-size:.8rem;padding:20px}
+a{color:var(--teal)}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="hero"><h1>Run your hospital on MediCore</h1><p>One connected platform: patient app, doctors, pharmacy &amp; delivery, laboratory, emergency dispatch and community health, on a single record. Pick a plan, create your admin account, and you're live in minutes.</p></div>
+<div class="wrap">
+  <div class="tiers" id="tiers"></div>
+  <div class="card">
+    <h2 style="margin:0 0 4px">Create your hospital</h2>
+    <div style="color:var(--muted);font-size:.88rem">You'll get an admin account to add your staff and patients.</div>
+    <div class="grid2">
+      <div><label>Hospital name</label><input id="hn" placeholder="e.g. Sunrise Medical Centre"></div>
+      <div><label>Area / city</label><input id="area" placeholder="e.g. Yaba, Lagos"></div>
+    </div>
+    <label>Your name (admin)</label><input id="an" placeholder="e.g. Dr. Ada Okoro">
+    <div class="grid2">
+      <div><label>Admin email (your login)</label><input id="ae" inputmode="email" placeholder="you@hospital.ng"></div>
+      <div><label>Password (min 6)</label><input id="ap" type="password" placeholder="choose a password"></div>
+    </div>
+    <label>Plan</label><select id="plan"></select>
+    <button class="btn" onclick="register()">Create hospital &amp; start</button>
+    <div class="msg" id="msg"></div>
+    <div id="done"></div>
+  </div>
+</div>
+<div class="foot">Already onboarded? <a href="/admin.html">Sign in to your hospital admin</a> \u00b7 MediCore HQ: <a href="/superadmin.html">platform console</a></div>
+<script>
+const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} return ''; })();
+let TIERS=[], SEL='hospital';
+async function load(){ const r=await fetch(API+'/api/tiers'); TIERS=await r.json();
+  document.getElementById('tiers').innerHTML=TIERS.map(t=>`<div class="tier ${t.key===SEL?'sel':''}" data-k="${t.key}" onclick="pick('${t.key}')"><h3>${t.label}</h3><div class="price">${t.priceNGN==null?'Custom':'\u20a6'+(t.priceNGN/1000)+'k'}<span style="font-size:.7rem;color:#889;font-weight:500">${t.priceNGN==null?'':'/mo'}</span></div><div class="blurb">${t.blurb}</div><ul class="apps">${t.apps.map(a=>`<li>${a}</li>`).join('')}</ul></div>`).join('');
+  document.getElementById('plan').innerHTML=TIERS.map(t=>`<option value="${t.key}" ${t.key===SEL?'selected':''}>${t.label}</option>`).join('');
+}
+function pick(k){ SEL=k; document.querySelectorAll('.tier').forEach(e=>e.classList.toggle('sel',e.dataset.k===k)); document.getElementById('plan').value=k; }
+document.addEventListener('change',e=>{ if(e.target.id==='plan'){ pick(e.target.value); } });
+async function register(){ const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
+  const body={hospitalName:v('hn'),area:v('area'),adminName:v('an'),adminEmail:v('ae'),adminPassword:v('ap'),tier:document.getElementById('plan').value};
+  try{ const r=await fetch(API+'/api/hospitals/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Registration failed');
+    document.getElementById('done').innerHTML=`<div class="done"><b>${d.hospital.name} is live on the ${d.hospital.tier} plan.</b><div style="margin-top:6px;font-size:.9rem">Sign in to your admin console with <b>${d.adminEmail}</b> and the password you chose.</div><a class="btn" style="display:inline-block;width:auto;text-decoration:none;margin-top:12px" href="/admin.html">Open admin console \u2192</a></div>`;
+    msg.textContent='';
+  }catch(e){ msg.textContent=e.message; msg.className='msg err'; } }
+function v(id){ return (document.getElementById(id).value||'').trim(); }
+load();
+</script>
+</body>
+</html>

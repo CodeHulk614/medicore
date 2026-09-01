@@ -344,6 +344,7 @@ input{font-family:inherit}
 <script src="/clockkit.js"></script>
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
+<script src="/plangate.js"></script>
 <script>
 'use strict';
 const I = {
@@ -408,7 +409,7 @@ async function syncQueue(){ if(OFFLINE){ toast('Still offline. Turn sync on firs
   setQueue(rest); await load(); render(); toast(ok+' record(s) synced'+(rest.length?', '+rest.length+' still pending':''));
 }
 TABS=[{id:'today',lab:'Today',ic:I.home},{id:'register',lab:'Register',ic:I.plus},{id:'me',lab:'Me',ic:I.user}];
-async function boot(){ try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'chw',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
+async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'chw'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'chw',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
 async function load(){ try{ const [roster,stats]=await Promise.all([api('/api/chw/roster'),api('/api/chw/stats').catch(()=>null)]); DATA.roster=roster; DATA.stats=stats; }catch(e){ /* offline: keep last */ } }
 headerExtra=()=>{ const n=queue().length; return `<button class="tb-btn" onclick="syncQueue()" title="Sync">${svg(I.sync,20)}${n?`<span style="position:absolute;top:-3px;right:-3px;background:var(--coral);color:#fff;font-size:.6rem;font-weight:800;border-radius:999px;padding:1px 5px">${n}</span>`:''}</button>`; };
 SCREENS.today={ body(){

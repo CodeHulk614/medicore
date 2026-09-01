@@ -59,6 +59,7 @@ svg.map{ width:100%; display:block; border-radius:12px; }
 <script src="/mapkit.js"></script>
 <script src="/clockkit.js"></script>
 <script src="/refresh.js"></script>
+<script src="/plangate.js"></script>
 <script>
 const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} const q=new URLSearchParams(location.search).get('api'); if(q) return q; if(location.protocol.startsWith('http')) return location.origin; return 'http://localhost:4000'; })();
 const TKEY='mccrew:token'; let TOKEN=null; try{ TOKEN=localStorage.getItem(TKEY); }catch(e){}
@@ -77,7 +78,7 @@ const UST={available:['#15A88A','Available'],dispatched:['#E9B23C','Dispatched']
 function uc(s){ return (UST[s]||['#93A9AA','—']); }
 let ME={unit:null,case:null,fleet:[],hospitals:[]};
 
-async function enter(){ $('lock').style.display='none'; $('app').style.display='block'; await refresh(); startPoll(); }
+async function enter(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'ambulance'}); }catch(e){} $('lock').style.display='none'; $('app').style.display='block'; await refresh(); startPoll(); }
 async function refresh(){ try{ ME=await api('/api/crew/me'); render(); }catch(e){ toast(e.message); } }
 function shapeOf(){ return ME.unit?(ME.unit.status+'|'+(ME.case?ME.case.id:'')):'nounit'; }
 let lastShape=''; let poll=null;

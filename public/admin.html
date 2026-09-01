@@ -498,11 +498,73 @@ SCREENS.home={ body(){ const o=DATA.ov, a=DATA.an;
   <div class="section-h"><h2>Doctor leaderboard</h2></div>
   <div class="menu-card">${a.leaderboard.length?a.leaderboard.map(d=>`<div class="lrow"><div class="grow"><div class="t" style="font-size:.9rem">${d.name}</div><div class="s">${d.specialty} \u00b7 ${d.visits} visits${d.rating?(' \u00b7 \u2605 '+d.rating):''}</div></div><span class="mini" style="font-weight:700">${money(d.earnings)}</span></div>`).join(''):'<div class="lrow"><div class="s muted">No consultations yet</div></div>'}</div>
   ${(o.doctors.pending||o.facilities.pending)?`<div class="card tap" style="margin-top:16px;background:var(--gold-soft)" onclick="switchTab('verify')"><div class="qrow"><div class="avatar sm gold">${svg(I.shield,20)}</div><div class="grow"><div class="k">${o.doctors.pending+o.facilities.pending} awaiting verification</div><div class="mini">Tap to review applications</div></div>${svg(I.chev,20)}</div></div>`:''}
-  ${(DATA.perms||[]).includes('admin.staff')?`<div class="card tap" style="margin-top:12px" onclick="go('access')"><div class="qrow"><div class="avatar sm teal">${svg(I.shield,20)}</div><div class="grow"><div class="k">Admin access levels</div><div class="mini">Grant each staff member a configurable admin authority</div></div>${svg(I.chev,20)}</div></div>`:''}
+  ${(DATA.perms||[]).includes('admin.staff')?`<div class="qa-grid" style="grid-template-columns:repeat(2,1fr);margin-top:12px">
+    <div class="card tap" onclick="go('staff')"><div class="qrow"><div class="avatar sm teal">${svg(I.users||I.shield,20)}</div><div class="grow"><div class="k">Staff</div><div class="mini">Add, activate, reset, remove</div></div></div></div>
+    <div class="card tap" onclick="go('patients')"><div class="qrow"><div class="avatar sm teal">${svg(I.user||I.shield,20)}</div><div class="grow"><div class="k">Patients</div><div class="mini">Register, edit, activate</div></div></div></div>
+  </div>
+  <div class="card tap" style="margin-top:12px" onclick="go('access')"><div class="qrow"><div class="avatar sm teal">${svg(I.shield,20)}</div><div class="grow"><div class="k">Admin access levels</div><div class="mini">Grant each staff member a configurable admin authority</div></div>${svg(I.chev,20)}</div></div>`:''}
   <div class="section-h"><h2>Recent activity</h2></div>
   <div class="menu-card">${(o.audit||[]).length?o.audit.map(x=>`<div class="lrow"><div class="ic">${svg(I.doc,18)}</div><div class="grow"><div class="t" style="font-size:.9rem">${x.action}</div><div class="s">${x.detail||''}</div></div><span class="mini">${new Date(x.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div>`).join(''):'<div class="lrow"><div class="s muted">No activity yet</div></div>'}</div>`;
 }};
 let ACCESS=null;
+let TEAM=[], PATS=[];
+const ROLE_OPTS=[['doctor','Doctor'],['frontdesk','Front office'],['pharmacy','Pharmacy'],['lab','Laboratory'],['dispatch','Dispatch'],['crew','Ambulance crew'],['rider','Delivery rider'],['chw','Community health'],['payer','Payer (HMO)'],['admin','Hospital admin']];
+function roleLabel(r){ const f=ROLE_OPTS.find(x=>x[0]===r); return f?f[1]:r; }
+function statusPill(s){ const map={active:'ok',suspended:'coral',removed:'grey','no-login':'grey'}; return `<span class="pill ${map[s]||'grey'}">${s==='no-login'?'no login':s}</span>`; }
+// ---------- STAFF ----------
+SCREENS.staff={ title:'Staff', body(){ return `<div class="greeting"><div class="hello">Staff.</div><div class="sub">Everyone who works at this hospital</div></div>
+  <button class="btn btn-primary btn-block tap" style="margin:12px 0" onclick="addStaffSheet()">+ Add staff member</button>
+  <div id="teamList"><div class="card"><div class="mini">Loading\u2026</div></div></div>`; }, after(){ loadTeam(); } };
+async function loadTeam(){ try{ TEAM=await api('/api/admin/team'); renderTeam(); }catch(e){ toast(e.message); } }
+function renderTeam(){ const el=$('teamList'); if(!el)return; if(!TEAM.length){ el.innerHTML='<div class="card"><div class="mini">No staff yet.</div></div>'; return; }
+  el.innerHTML=TEAM.slice().sort((a,b)=>a.role.localeCompare(b.role)).map(s=>`<div class="card" style="margin-bottom:10px"><div class="qrow"><div class="grow"><div class="k">${s.name} ${statusPill(s.status)}</div><div class="mini">${roleLabel(s.role)}${s.subrole?(' \u00b7 '+s.subrole):''} \u00b7 ${s.email}${s.online?' \u00b7 online':''}</div></div></div>
+    <div class="qrow" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${s.status==='active'?`<button class="btn btn-line tap" onclick="setStaffStatus('${s.id}','suspended')">Deactivate</button>`:`<button class="btn btn-line tap" onclick="setStaffStatus('${s.id}','active')">Activate</button>`}
+      <button class="btn btn-line tap" onclick="resetStaffSheet('${s.id}','${s.name.replace(/'/g,"")}')">Reset password</button>
+      <button class="btn btn-line tap" style="color:var(--coral)" onclick="removeStaff('${s.id}','${s.name.replace(/'/g,"")}')">Remove</button>
+    </div></div>`).join(''); }
+function addStaffSheet(){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Add staff member</div>
+  <div class="field"><label>Full name</label><input id="stName" placeholder="e.g. Grace Okon"></div>
+  <div class="field"><label>Email (login)</label><input id="stEmail" placeholder="name@hospital.ng" inputmode="email"></div>
+  <div class="field"><label>Role</label><select id="stRole">${ROLE_OPTS.map(r=>`<option value="${r[0]}">${r[1]}</option>`).join('')}</select></div>
+  <div class="field"><label>Temporary password</label><input id="stPass" placeholder="they change it later" value="welcome123"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="createStaff()">Create staff</button>`); }
+async function createStaff(){ const body={name:$('stName').value.trim(),email:$('stEmail').value.trim(),role:$('stRole').value,tempPassword:$('stPass').value.trim()};
+  try{ const r=await api('/api/admin/team',{method:'POST',body}); closeSheet(); await loadTeam(); toast('Staff added \u00b7 temp password '+r.tempPassword); }catch(e){ toast(e.message); } }
+async function setStaffStatus(id,s){ try{ await api('/api/admin/team/'+id+'/status',{method:'POST',body:{status:s}}); await loadTeam(); toast(s==='active'?'Activated':'Deactivated'); }catch(e){ toast(e.message); } }
+function resetStaffSheet(id,name){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:8px">Reset password</div><div class="mini" style="margin-bottom:12px">Set a new temporary password for ${name}.</div><div class="field"><label>Temporary password</label><input id="rsPass" value="welcome123"></div><button class="btn btn-primary btn-block btn-lg tap" onclick="doResetStaff('${id}')">Reset</button>`); }
+async function doResetStaff(id){ try{ const r=await api('/api/admin/team/'+id+'/reset',{method:'POST',body:{tempPassword:$('rsPass').value.trim()}}); closeSheet(); toast('Password reset to '+r.tempPassword); }catch(e){ toast(e.message); } }
+async function removeStaff(id,name){ if(!confirm('Remove '+name+'? They will no longer be able to log in.'))return; try{ await api('/api/admin/team/'+id,{method:'DELETE'}); await loadTeam(); toast('Removed'); }catch(e){ toast(e.message); } }
+// ---------- PATIENTS ----------
+SCREENS.patients={ title:'Patients', body(){ return `<div class="greeting"><div class="hello">Patients.</div><div class="sub">Register and manage patient records</div></div>
+  <button class="btn btn-primary btn-block tap" style="margin:12px 0" onclick="addPatientSheet()">+ Register patient</button>
+  <input id="patSearch" placeholder="Search by name\u2026" oninput="renderPats()" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
+  <div id="patList"><div class="card"><div class="mini">Loading\u2026</div></div></div>`; }, after(){ loadPats(); } };
+async function loadPats(){ try{ PATS=await api('/api/admin/patients'); renderPats(); }catch(e){ toast(e.message); } }
+function renderPats(){ const el=$('patList'); if(!el)return; const q=($('patSearch')&&$('patSearch').value||'').toLowerCase();
+  const list=PATS.filter(p=>!q||p.name.toLowerCase().includes(q)); if(!list.length){ el.innerHTML='<div class="card"><div class="mini">No patients'+(q?' match':'')+'.</div></div>'; return; }
+  el.innerHTML=list.map(p=>`<div class="card" style="margin-bottom:10px"><div class="qrow"><div class="grow"><div class="k">${p.name} ${p.status!=='no-login'?statusPill(p.status):''}</div><div class="mini">${p.hn} \u00b7 ${p.sex||''} \u00b7 ${p.plan||''}${p.phone?(' \u00b7 '+p.phone):''}</div></div></div>
+    <div class="qrow" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-line tap" onclick="editPatientSheet('${p.id}')">Edit</button>
+      ${p.status==='active'?`<button class="btn btn-line tap" onclick="setPatStatus('${p.id}','suspended')">Deactivate</button>`:(p.status==='suspended'?`<button class="btn btn-line tap" onclick="setPatStatus('${p.id}','active')">Activate</button>`:'')}
+    </div></div>`).join(''); }
+function addPatientSheet(){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Register patient</div>
+  <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>First name</label><input id="paF"></div><div class="field" style="flex:1"><label>Last name</label><input id="paL"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>Phone</label><input id="paPhone" inputmode="tel"></div><div class="field" style="flex:1"><label>Sex</label><select id="paSex"><option value="">-</option><option>female</option><option>male</option></select></div></div>
+  <div class="field"><label>Plan</label><select id="paPlan"><option>Self-pay</option><option>Avon HMO</option><option>Hygeia HMO</option></select></div>
+  <div class="field"><label>Address</label><input id="paAddr"></div>
+  <div class="mini" style="margin:2px 0 8px">Optional login:</div>
+  <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>Email</label><input id="paEmail" inputmode="email"></div><div class="field" style="flex:1"><label>Temp password</label><input id="paPass"></div></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="createPatient()">Register</button>`); }
+async function createPatient(){ const plan=$('paPlan').value; const body={first:$('paF').value.trim(),last:$('paL').value.trim(),phone:$('paPhone').value.trim(),sex:$('paSex').value,plan,hmo:/HMO/.test(plan)?plan:'',address:$('paAddr').value.trim(),email:$('paEmail').value.trim(),tempPassword:$('paPass').value.trim()};
+  try{ await api('/api/admin/patients',{method:'POST',body}); closeSheet(); await loadPats(); toast('Patient registered'); }catch(e){ toast(e.message); } }
+function editPatientSheet(id){ const p=PATS.find(x=>x.id===id); if(!p)return; openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Edit ${p.name}</div>
+  <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>First</label><input id="epF" value="${(p.first||'').replace(/"/g,'&quot;')}"></div><div class="field" style="flex:1"><label>Last</label><input id="epL" value="${(p.last||'').replace(/"/g,'&quot;')}"></div></div>
+  <div class="field"><label>Phone</label><input id="epPhone" value="${(p.phone||'').replace(/"/g,'&quot;')}"></div>
+  <div class="field"><label>Address</label><input id="epAddr" value="${(p.address||'').replace(/"/g,'&quot;')}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="savePatient('${id}')">Save</button>`); }
+async function savePatient(id){ try{ await api('/api/admin/patients/'+id,{method:'POST',body:{first:$('epF').value.trim(),last:$('epL').value.trim(),phone:$('epPhone').value.trim(),address:$('epAddr').value.trim()}}); closeSheet(); await loadPats(); toast('Saved'); }catch(e){ toast(e.message); } }
+async function setPatStatus(id,s){ try{ await api('/api/admin/patients/'+id+'/status',{method:'POST',body:{status:s}}); await loadPats(); toast(s==='active'?'Activated':'Deactivated'); }catch(e){ toast(e.message); } }
 SCREENS.access={ title:'Access levels', body(){ return `<div class="greeting"><div class="hello">Access levels.</div><div class="sub">Give each staff member a configurable admin authority</div></div>
   <div id="accessBox" style="margin-top:12px"><div class="card"><div class="mini">Loading\u2026</div></div></div>`; }, after(){ loadAccess(); } };
 async function loadAccess(){ try{ ACCESS=await api('/api/admin/access'); renderAccess(); }catch(e){ toast(e.message); } }

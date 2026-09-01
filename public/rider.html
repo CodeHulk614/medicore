@@ -345,6 +345,7 @@ input{font-family:inherit}
 <script src="/clockkit.js"></script>
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
+<script src="/plangate.js"></script>
 <script>
 'use strict';
 const I = {
@@ -395,7 +396,7 @@ function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentEl
 
 let DATA={jobs:[]};
 TABS=[{id:'jobs',lab:'Jobs',ic:I.truck},{id:'me',lab:'Me',ic:I.user}];
-async function boot(){ try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'rider',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
+async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'pharmacy'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'rider',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
 async function load(){ const [jobs,stats,rxdel]=await Promise.all([api('/api/rider/jobs'),api('/api/rider/stats').catch(()=>null),api('/api/rider/deliveries').catch(()=>[])]); DATA.jobs=jobs; DATA.stats=stats; DATA.rxdel=rxdel||[]; }
 const STAGE=['','Preparing','Picked up','On the way','Delivered'];
 SCREENS.jobs={ body(){

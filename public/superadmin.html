@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0C2A2E">
+<title>MediCore HQ</title>
+<link rel="manifest" href="/superadmin.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="/icons/admin-192.png">
+<style>
+:root{--bg:#EDF2F2;--surface:#fff;--surface-2:#F4F8F8;--ink:#12302f;--muted:#6a7d7d;--line:#E1EAEA;--teal:#15707A;--gold:#E9B23C;--coral:#DF5039;--green:#15A88A}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:900px;margin:0 auto;padding:16px 16px 60px}
+.top{display:flex;align-items:center;gap:10px;padding:6px 0 14px}
+.brand{font-weight:800;font-size:1.25rem;color:#0C2A2E} .brand span{color:var(--teal)}
+.pill{display:inline-block;font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px}
+.pill.teal{background:#DCECEC;color:var(--teal)} .pill.green{background:#DBF4EC;color:#0d7a5f} .pill.gold{background:#FBEFD3;color:#8a6a12} .pill.coral{background:#FDECE8;color:#b4402a} .pill.grey{background:#eef2f2;color:#5a6a6a}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 4px 16px rgba(12,42,46,.05)}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.kpi{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .n{font-size:1.5rem;font-weight:800;color:var(--teal)} .kpi .l{font-size:.72rem;color:var(--muted);margin-top:2px}
+.hosp{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.hname{font-weight:800;font-size:1.05rem} .hsub{color:var(--muted);font-size:.82rem;margin-top:2px}
+.mods{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.mod{font-size:.75rem;border:1px solid var(--line);border-radius:20px;padding:4px 10px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px;background:#fff}
+.mod.on{background:#DCECEC;border-color:#bcdcdc;color:var(--teal);font-weight:700}
+.mod .dot{width:8px;height:8px;border-radius:50%;background:#cfd9d9} .mod.on .dot{background:var(--green)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+select,input{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:9px 14px;cursor:pointer}
+.btn.primary{background:var(--teal);color:#fff;border-color:var(--teal)} .btn.coral{color:var(--coral)} .btn.block{display:block;width:100%}
+label{font-size:.75rem;color:var(--muted);font-weight:700;display:block;margin:8px 0 3px}
+.hidden{display:none}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0C2A2E;color:#fff;padding:10px 16px;border-radius:12px;font-size:.85rem;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transition:opacity .25s,transform .25s;z-index:99}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.center{min-height:80vh;display:flex;align-items:center;justify-content:center}
+.login{width:100%;max-width:360px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="brand">MediCore <span>HQ</span></div><span class="pill teal" id="whoami" style="margin-left:auto"></span></div>
+  <div id="loginView" class="center"><div class="login card">
+    <div class="hname" style="margin-bottom:2px">Platform control</div>
+    <div class="hsub" style="margin-bottom:14px">Sign in as MediCore HQ to manage hospital subscriptions.</div>
+    <label>Email</label><input id="email" value="super@demo.ng" style="width:100%">
+    <label>Password</label><input id="pass" type="password" value="demo1234" style="width:100%">
+    <button class="btn primary block" style="margin-top:14px" onclick="doLogin()">Sign in</button>
+    <div id="loginErr" class="hsub" style="color:var(--coral);margin-top:10px"></div>
+  </div></div>
+  <div id="app" class="hidden">
+    <div class="kpis" id="kpis"></div>
+    <button class="btn primary block" style="margin-bottom:14px" onclick="openReg()">+ Onboard a new hospital</button>
+    <div id="hospitals"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} return ''; })();
+let TOKEN=localStorage.getItem('mchq:token')||null; let TIERS=[]; let HOSP=[];
+const $=id=>document.getElementById(id);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
+async function api(path,opts){ opts=opts||{}; const h={'Content-Type':'application/json'}; if(TOKEN)h.Authorization='Bearer '+TOKEN; const r=await fetch(API+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error||('Error '+r.status)); return d; }
+async function doLogin(){ $('loginErr').textContent=''; try{ const r=await api('/api/auth/login',{method:'POST',body:{email:$('email').value.trim(),password:$('pass').value}}); TOKEN=r.token; localStorage.setItem('mchq:token',TOKEN); boot(); }catch(e){ $('loginErr').textContent=e.message; } }
+function money(n){ return n==null?'Custom':'\u20a6'+(n/1000)+'k/mo'; }
+const MODS=[['marketplace','Patient'],['pharmacy','Pharmacy'],['lab','Lab'],['ambulance','Ambulance'],['chw','Community'],['analytics','Analytics'],['wearables','Health data']];
+function tierLabel(k){ const t=TIERS.find(x=>x.key===k); return t?t.label:k; }
+async function boot(){
+  try{ const me=await api('/api/me/hospital').catch(()=>null); }catch(e){}
+  try{ HOSP=await api('/api/super/hospitals'); }catch(e){ if(/403|Platform/.test(e.message)){ toast('That account is not MediCore HQ'); TOKEN=null; localStorage.removeItem('mchq:token'); return showLogin(); } toast(e.message); return; }
+  TIERS=await api('/api/tiers').catch(()=>[]);
+  $('loginView').classList.add('hidden'); $('app').classList.remove('hidden'); $('whoami').textContent='MediCore HQ';
+  render();
+}
+function showLogin(){ $('app').classList.add('hidden'); $('loginView').classList.remove('hidden'); }
+function render(){
+  const active=HOSP.filter(h=>!h.subscription||h.subscription.status!=='suspended').length;
+  const patients=HOSP.reduce((s,h)=>s+(h.patients||0),0); const staff=HOSP.reduce((s,h)=>s+(h.staff||0),0);
+  const mrr=HOSP.reduce((s,h)=>{ const t=TIERS.find(x=>x.key===(h.subscription&&h.subscription.tier)); return s+((t&&t.priceNGN)||0); },0);
+  $('kpis').innerHTML=[['Hospitals',HOSP.length],['Active',active],['Patients',patients],['Staff',staff],['Est. MRR','\u20a6'+(mrr/1000)+'k']].map(k=>`<div class="kpi"><div class="n">${k[1]}</div><div class="l">${k[0]}</div></div>`).join('');
+  $('hospitals').innerHTML=HOSP.map(h=>{ const sub=h.subscription||{tier:'hospital',status:'active'}; const st=sub.status;
+    const stPill=st==='suspended'?'coral':(st==='trial'?'gold':'green');
+    return `<div class="card"><div class="hosp"><div><div class="hname">${h.name} <span class="pill teal">${tierLabel(sub.tier)}</span> <span class="pill ${stPill}">${st}</span></div><div class="hsub">${h.code} \u00b7 ${h.area||'\u2014'} \u00b7 ${h.patients||0} patients \u00b7 ${h.staff||0} staff \u00b7 ${h.doctors||0} doctors</div></div></div>
+    <div class="mods">${MODS.map(m=>`<div class="mod ${h.modules&&h.modules[m[0]]?'on':''}" onclick="toggleMod('${h.id}','${m[0]}',${!(h.modules&&h.modules[m[0]])})"><span class="dot"></span>${m[1]}</div>`).join('')}</div>
+    <div class="row">
+      <label style="margin:0">Plan</label>
+      <select onchange="setTier('${h.id}',this.value)">${TIERS.map(t=>`<option value="${t.key}" ${t.key===sub.tier?'selected':''}>${t.label} \u00b7 ${money(t.priceNGN)}</option>`).join('')}</select>
+      ${st==='suspended'?`<button class="btn" onclick="setStatus('${h.id}','active')">Reactivate</button>`:`<button class="btn coral" onclick="setStatus('${h.id}','suspended')">Suspend</button>`}
+    </div></div>`; }).join('');
+}
+async function toggleMod(id,key,on){ try{ await api('/api/super/hospitals/'+id+'/modules',{method:'POST',body:{modules:{[key]:on}}}); const h=HOSP.find(x=>x.id===id); h.modules=Object.assign({},h.modules,{[key]:on}); render(); toast((on?'Enabled ':'Disabled ')+key); }catch(e){ toast(e.message); } }
+async function setTier(id,tier){ try{ const h=await api('/api/super/hospitals/'+id+'/tier',{method:'POST',body:{tier}}); const i=HOSP.findIndex(x=>x.id===id); HOSP[i]=Object.assign(HOSP[i],h); render(); toast('Plan set to '+tierLabel(tier)); }catch(e){ toast(e.message); } }
+async function setStatus(id,status){ try{ const h=await api('/api/super/hospitals/'+id+'/status',{method:'POST',body:{status}}); const i=HOSP.findIndex(x=>x.id===id); HOSP[i].subscription=h.subscription; render(); toast(status==='suspended'?'Suspended':'Reactivated'); }catch(e){ toast(e.message); } }
+function openReg(){ const name=prompt('Hospital name'); if(!name)return; const area=prompt('Area / city','')||''; const email=prompt('Admin email'); if(!email)return; const pass=prompt('Admin temporary password (min 6)'); if(!pass)return; const tier=prompt('Plan: starter / clinic / hospital / enterprise','hospital')||'hospital';
+  api('/api/super/hospitals',{method:'POST',body:{name,area,code:name.replace(/[^A-Za-z]/g,'').slice(0,6).toUpperCase()+Math.floor(10+Math.random()*89),adminName:name+' Admin',adminEmail:email,adminPassword:pass}})
+    .then(async(h)=>{ if(tier&&tier!=='hospital'){ try{ await api('/api/super/hospitals/'+h.id+'/tier',{method:'POST',body:{tier}}); }catch(e){} } HOSP=await api('/api/super/hospitals'); render(); toast('Hospital onboarded'); })
+    .catch(e=>toast(e.message));
+}
+if(TOKEN) boot(); else showLogin();
+</script>
+</body>
+</html>

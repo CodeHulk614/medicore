@@ -2,7 +2,7 @@
 const CACHE = 'medicore-v2';
 const SHELL = ['/index.html','/doctor.html','/frontdesk.html','/admin.html','/payer.html',
   '/pharmacy.html','/lab.html','/rider.html','/dispatch.html','/chw.html','/crew.html',
-  '/mapkit.js','/refresh.js','/clockkit.js','/clockgate.js','/rtc.js'];
+  '/mapkit.js','/refresh.js','/clockkit.js','/clockgate.js','/rtc.js','/plangate.js'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(()=>{})).then(()=>self.skipWaiting()));
 });
