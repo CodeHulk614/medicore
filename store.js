@@ -38,7 +38,12 @@ function save() {
 }
 
 function get() { return db || load(); }
-function hydrate(obj) { db = obj || EMPTY(); return db; }    // serverless: load a db object from Blobs
+function hydrate(obj) {                                      // serverless: load a db object, mutating the
+  const target = db || load();                               // SAME singleton the app modules captured at require,
+  Object.keys(target).forEach(k => { delete target[k]; });   // so their `const db = store.get()` references stay valid
+  Object.assign(target, obj || EMPTY());
+  db = target; return db;
+}
 function snapshot() { return db; }                          // serverless: get the db object to persist
 
 module.exports = { load, save, get, hydrate, snapshot, FILE, SERVERLESS };
