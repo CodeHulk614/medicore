@@ -173,6 +173,10 @@ function seed(force) {
   db.patients.push(
     { id: 'p_ngozi', first: 'Ngozi', last: 'Abah', hn: 'CH-100241', member: '', dob: '1994-06-02', sex: 'female', bg: '', phone: '0803 900 1122', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [{ name: 'Pregnancy (32 weeks)', code: 'Z34', since: '2026' }], registeredBy: 'u_chw', area: 'Makoko', nextVisit: 'Antenatal check due' },
     { id: 'p_sadiq', first: 'Sadiq', last: 'Bello', hn: 'CH-100242', member: '', dob: '2024-01-15', sex: 'male', bg: '', phone: '0806 200 3344', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [], registeredBy: 'u_chw', area: 'Makoko', nextVisit: 'Immunization due (6 weeks)' },
+    { id: 'p_amina', first: 'Amina', last: 'Yusuf', hn: 'CH-100243', member: '', dob: '1999-03-11', sex: 'female', bg: '', phone: '0807 411 5566', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [{ name: 'Pregnancy (18 weeks)', code: 'Z34', since: '2026' }], registeredBy: 'u_chw', area: 'Makoko', nextVisit: 'Antenatal check due' },
+    { id: 'p_emeka2', first: 'Emeka', last: 'Nwodo', hn: 'CH-100244', member: '', dob: '2025-06-20', sex: 'male', bg: '', phone: '0803 233 7788', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [], registeredBy: 'u_chw', area: 'Iwaya', nextVisit: 'Immunization due (14 weeks)' },
+    { id: 'p_grace2', first: 'Grace', last: 'Etim', hn: 'CH-100245', member: '', dob: '1978-09-02', sex: 'female', bg: '', phone: '0806 990 1122', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [{ name: 'Hypertension', code: 'I10', since: '2021' }], registeredBy: 'u_chw', area: 'Makoko', nextVisit: 'BP follow-up due' },
+    { id: 'p_musa2', first: 'Musa', last: 'Ibrahim', hn: 'CH-100246', member: '', dob: '2020-02-14', sex: 'male', bg: '', phone: '0805 550 3344', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [], registeredBy: 'u_chw', area: 'Iwaya', nextVisit: 'Nutrition check due' },
   );
 
   /* ============================================================
@@ -182,9 +186,11 @@ function seed(force) {
   const H = () => bcrypt.hashSync('demo1234', 10);
   db.hospitals = [
     { id: 'h_grand', name: 'Grandville Hospital', area: 'Surulere', code: 'GRAND', lat: 6.499, lng: 3.354,
+      subscription: { tier: 'hospital', status: 'active', since: Date.now() - 120*86400000 },
       modules: { marketplace: true, pharmacy: true, lab: true, ambulance: true, chw: true, analytics: true, wearables: true } },
     { id: 'h_river', name: 'Riverside Medical Centre', area: 'Lekki', code: 'RIVER', lat: 6.446, lng: 3.512,
-      modules: { marketplace: true, pharmacy: true, lab: true, ambulance: true, chw: false, analytics: true, wearables: true } },
+      subscription: { tier: 'clinic', status: 'active', since: Date.now() - 60*86400000 },
+      modules: { marketplace: true, pharmacy: true, lab: true, ambulance: false, chw: false, analytics: true, wearables: true } },
   ];
   const DOCH = { doc_tunde: 'h_grand', doc_bisi: 'h_grand', doc_ifeoma: 'h_grand', doc_musa: 'h_grand', doc_yakubu: 'h_grand', doc_ada: 'h_river', doc_chidinma: 'h_river', doc_okon: 'h_river', doc_kunle: 'h_grand', doc_halima: 'h_river' };
   db.doctors.forEach(d => { d.hospitalId = DOCH[d.id] || 'h_grand'; });

@@ -10,7 +10,7 @@ const X = require('./integrations');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const PORT = process.env.PORT || 4000;
-const BUILD = '2026-08-31 background-refresh+clock-gate';
+const BUILD = '2026-09-01 mongo+staff-mgmt+clockin-enforced';
 
 seed();                 // ensure a starting record exists
 // auto-seed on a fresh deploy so demo logins work immediately
@@ -42,6 +42,9 @@ app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   const user = db.users.find(u => u.email === (email || '').toLowerCase());
   if (!user || !bcrypt.compareSync(password || '', user.pass)) return res.status(401).json({ error: 'Wrong email or password' });
+  if (user.status === 'suspended') return res.status(403).json({ error: 'This account is deactivated. Contact your hospital admin.' });
+  if (user.status === 'removed') return res.status(403).json({ error: 'This account no longer exists.' });
+  if (user.role !== 'superadmin' && user.hospitalId) { const uh = hospitalById(user.hospitalId); if (uh && uh.subscription && uh.subscription.status === 'suspended') return res.status(403).json({ error: 'This hospital\'s MediCore subscription is suspended. Please contact MediCore HQ.' }); }
   res.json({ token: sign(user) });
 });
 
@@ -505,6 +508,92 @@ app.post('/api/admin/settlements/pay', auth, requirePerm('admin.settlements'), (
 });
 app.get('/api/admin/users', auth, requirePerm('admin.staff'), (req, res) => res.json(db.users.map(u => ({ id: u.id, role: u.role, name: u.name, email: u.email }))));
 
+/* ---- Staff management (create / activate / deactivate / reset / remove), hospital-scoped ---- */
+const STAFF_ROLES = ['doctor', 'frontdesk', 'pharmacy', 'lab', 'dispatch', 'crew', 'rider', 'chw', 'payer', 'admin'];
+function staffView(u) { return { id: u.id, name: u.name, email: u.email, role: u.role, subrole: u.subrole || '', status: u.status || 'active', online: isOnline(u.id), doctorId: u.doctorId }; }
+app.get('/api/admin/team', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req);
+  res.json(db.users.filter(u => u.hospitalId === hid && u.role !== 'patient' && u.status !== 'removed').map(staffView));
+});
+app.post('/api/admin/team', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const b = req.body || {};
+  const name = (b.name || '').trim(), email = (b.email || '').trim().toLowerCase(), role = b.role, pw = (b.tempPassword || '').trim();
+  if (!name || !email || !role || !pw) return res.status(400).json({ error: 'Name, email, role and a temporary password are required' });
+  if (!STAFF_ROLES.includes(role)) return res.status(400).json({ error: 'Unknown role' });
+  if (pw.length < 4) return res.status(400).json({ error: 'Temporary password is too short' });
+  if (db.users.find(u => u.email === email)) return res.status(409).json({ error: 'That email is already in use' });
+  const u = { id: uid('u'), role, hospitalId: hid, status: 'active', name, email, pass: bcrypt.hashSync(pw, 10) };
+  if (role === 'frontdesk' && b.subrole) u.subrole = b.subrole;
+  if (role === 'doctor') {
+    const d = { id: uid('doc'), userId: u.id, name, specialty: b.specialty || 'General Physician', facility: hospitalName(hid), area: (hospitalById(hid) || {}).area || '', languages: ['English'], fee: 6000, feeInPerson: 6000, feeVideo: 5000, rating: 0, reviews: 0, bio: '', available: true, slots: ['09:00', '10:00', '11:00'], status: 'verified', hospitalId: hid };
+    u.doctorId = d.id; db.doctors.push(d);
+  }
+  db.users.push(u); logAudit('Admin', 'staff.create', name + ' (' + role + ')'); store.save();
+  res.json({ ok: true, staff: staffView(u), tempPassword: pw });
+});
+app.post('/api/admin/team/:id/status', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const u = db.users.find(x => x.id === req.params.id && x.hospitalId === hid && x.role !== 'patient');
+  if (!u) return res.status(404).json({ error: 'Staff member not found' });
+  if (u.id === req.user.id) return res.status(400).json({ error: 'You cannot change your own status' });
+  const s = (req.body || {}).status; if (!['active', 'suspended'].includes(s)) return res.status(400).json({ error: 'status must be active or suspended' });
+  u.status = s; logAudit('Admin', 'staff.status', u.name + ' -> ' + s); store.save();
+  res.json({ ok: true, staff: staffView(u) });
+});
+app.post('/api/admin/team/:id/reset', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const u = db.users.find(x => x.id === req.params.id && x.hospitalId === hid && x.role !== 'patient');
+  if (!u) return res.status(404).json({ error: 'Staff member not found' });
+  const pw = ((req.body || {}).tempPassword || '').trim(); if (pw.length < 4) return res.status(400).json({ error: 'Temporary password is too short' });
+  u.pass = bcrypt.hashSync(pw, 10); logAudit('Admin', 'staff.reset', u.name); store.save();
+  res.json({ ok: true, tempPassword: pw });
+});
+app.delete('/api/admin/team/:id', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const u = db.users.find(x => x.id === req.params.id && x.hospitalId === hid && x.role !== 'patient');
+  if (!u) return res.status(404).json({ error: 'Staff member not found' });
+  if (u.id === req.user.id) return res.status(400).json({ error: 'You cannot remove yourself' });
+  u.status = 'removed'; logAudit('Admin', 'staff.remove', u.name); store.save();
+  res.json({ ok: true });
+});
+
+/* ---- Patient management (register / edit / activate / deactivate), hospital-scoped ---- */
+function patientView(p) { const u = db.users.find(x => x.patientId === p.id); return { id: p.id, name: (p.first || '') + ' ' + (p.last || ''), first: p.first, last: p.last, phone: p.phone, hn: p.hn, dob: p.dob, sex: p.sex, plan: p.plan, hmo: p.hmo, tier: p.tier, address: p.address, email: u ? u.email : '', status: u ? (u.status || 'active') : 'no-login' }; }
+app.get('/api/admin/patients', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req);
+  res.json(db.patients.filter(p => p.hospitalId === hid).map(patientView));
+});
+app.post('/api/admin/patients', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const b = req.body || {};
+  const first = (b.first || '').trim(), last = (b.last || '').trim();
+  if (!first || !last) return res.status(400).json({ error: 'First and last name are required' });
+  const hn = (hid === 'h_river' ? 'RV-' : 'GH-') + Math.floor(100000 + Math.random() * 899999);
+  const p = { id: uid('p'), first, last, hn, member: b.member || '', dob: b.dob || '', sex: b.sex || '', bg: b.bg || '', phone: b.phone || '', plan: b.plan || 'Self-pay', tier: b.tier || 'Standard', hmo: b.hmo || '', address: b.address || '', homeLat: b.homeLat || null, homeLng: b.homeLng || null, area: b.area || '', allergies: [], conditions: [], hospitalId: hid };
+  db.patients.push(p);
+  const email = (b.email || '').trim().toLowerCase(), pw = (b.tempPassword || '').trim();
+  if (email && pw) {
+    if (db.users.find(u => u.email === email)) return res.status(409).json({ error: 'That email is already in use' });
+    if (pw.length < 4) return res.status(400).json({ error: 'Temporary password is too short' });
+    db.users.push({ id: uid('u'), role: 'patient', patientId: p.id, hospitalId: hid, status: 'active', name: first + ' ' + last, email, pass: bcrypt.hashSync(pw, 10) });
+  }
+  logAudit('Admin', 'patient.create', first + ' ' + last); store.save();
+  res.json({ ok: true, patient: patientView(p) });
+});
+app.post('/api/admin/patients/:id', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const p = db.patients.find(x => x.id === req.params.id && x.hospitalId === hid);
+  if (!p) return res.status(404).json({ error: 'Patient not found' });
+  const b = req.body || {};
+  ['first', 'last', 'phone', 'dob', 'sex', 'plan', 'tier', 'hmo', 'address', 'area'].forEach(k => { if (b[k] !== undefined) p[k] = b[k]; });
+  const u = db.users.find(x => x.patientId === p.id); if (u) u.name = (p.first || '') + ' ' + (p.last || '');
+  logAudit('Admin', 'patient.edit', p.first + ' ' + p.last); store.save();
+  res.json({ ok: true, patient: patientView(p) });
+});
+app.post('/api/admin/patients/:id/status', auth, requirePerm('admin.staff'), (req, res) => {
+  const hid = adminHid(req); const p = db.patients.find(x => x.id === req.params.id && x.hospitalId === hid);
+  if (!p) return res.status(404).json({ error: 'Patient not found' });
+  const u = db.users.find(x => x.patientId === p.id); if (!u) return res.status(400).json({ error: 'This patient has no login to change' });
+  const s = (req.body || {}).status; if (!['active', 'suspended'].includes(s)) return res.status(400).json({ error: 'status must be active or suspended' });
+  u.status = s; logAudit('Admin', 'patient.status', p.first + ' ' + p.last + ' -> ' + s); store.save();
+  res.json({ ok: true, patient: patientView(p) });
+});
+
 /* ============================================================
  * HMO / PAYER
  * ============================================================ */
@@ -812,6 +901,55 @@ app.post('/api/super/hospitals/:id/modules', auth, superOnly, (req, res) => {
   const h = hospitalById(req.params.id); if (!h) return res.status(404).json({ error: 'Hospital not found' });
   h.modules = Object.assign({}, h.modules, (req.body && req.body.modules) || {});
   logAudit('MediCore HQ', 'hospital.modules', h.name); store.save(); res.json(h);
+});
+
+/* ---- Subscription tiers: hospitals subscribe to a plan that unlocks a set of apps ---- */
+const TIERS = {
+  starter:    { label: 'Starter',    priceNGN: 50000,  blurb: 'Records, patient app & pharmacy',          modules: { marketplace: true, pharmacy: true, lab: false, ambulance: false, chw: false, analytics: false, wearables: false } },
+  clinic:     { label: 'Clinic',     priceNGN: 150000, blurb: 'Adds laboratory & analytics',              modules: { marketplace: true, pharmacy: true, lab: true,  ambulance: false, chw: false, analytics: true,  wearables: false } },
+  hospital:   { label: 'Hospital',   priceNGN: 400000, blurb: 'Full suite: ambulance & community health', modules: { marketplace: true, pharmacy: true, lab: true,  ambulance: true,  chw: true,  analytics: true,  wearables: true } },
+  enterprise: { label: 'Enterprise', priceNGN: null,   blurb: 'Everything, multi-site & priority support', modules: { marketplace: true, pharmacy: true, lab: true,  ambulance: true,  chw: true,  analytics: true,  wearables: true } },
+};
+const APP_LABELS = { marketplace: 'Patient app & booking', pharmacy: 'Pharmacy & delivery', lab: 'Laboratory', ambulance: 'Emergency & dispatch', chw: 'Community health', analytics: 'Admin analytics', wearables: 'Health data' };
+app.get('/api/tiers', (req, res) => res.json(Object.keys(TIERS).map(k => ({ key: k, label: TIERS[k].label, priceNGN: TIERS[k].priceNGN, blurb: TIERS[k].blurb, apps: Object.keys(TIERS[k].modules).filter(m => TIERS[k].modules[m]).map(m => APP_LABELS[m] || m) }))));
+
+// PUBLIC: a hospital signs itself up for a plan (self-service onboarding).
+app.post('/api/hospitals/register', (req, res) => {
+  const b = req.body || {};
+  const name = (b.hospitalName || '').trim(), tier = b.tier || 'clinic';
+  const adminName = (b.adminName || '').trim(), adminEmail = (b.adminEmail || '').trim().toLowerCase(), adminPassword = (b.adminPassword || '').trim();
+  if (!name) return res.status(400).json({ error: 'Hospital name is required' });
+  if (!adminEmail || !adminPassword) return res.status(400).json({ error: 'Admin email and password are required' });
+  if (adminPassword.length < 6) return res.status(400).json({ error: 'Admin password must be at least 6 characters' });
+  if (!TIERS[tier]) return res.status(400).json({ error: 'Unknown plan' });
+  if (db.users.find(u => u.email === adminEmail)) return res.status(409).json({ error: 'That admin email is already in use' });
+  const code = (name.replace(/[^A-Za-z]/g, '').slice(0, 6).toUpperCase() || 'HOSP') + Math.floor(10 + Math.random() * 89);
+  const h = { id: uid('h'), name, area: b.area || '', code, lat: null, lng: null, modules: Object.assign({}, TIERS[tier].modules), subscription: { tier, status: 'trial', since: Date.now() } };
+  db.hospitals.push(h);
+  db.users.push({ id: uid('u'), role: 'admin', hospitalId: h.id, status: 'active', name: adminName || (name + ' Admin'), email: adminEmail, pass: bcrypt.hashSync(adminPassword, 10) });
+  logAudit('MediCore HQ', 'hospital.registered', name + ' (' + tier + ')'); store.save();
+  res.json({ ok: true, hospital: { id: h.id, name: h.name, code: h.code, tier: TIERS[tier].label }, adminEmail });
+});
+
+// Any signed-in user can read their hospital's plan, so each app can self-gate.
+app.get('/api/me/hospital', auth, (req, res) => {
+  const h = hospitalById(req.user.hospitalId);
+  if (!h) return res.json({ modules: {}, subscription: null });
+  res.json({ id: h.id, name: h.name, area: h.area, modules: h.modules || {}, subscription: h.subscription || { tier: 'hospital', status: 'active' } });
+});
+
+app.post('/api/super/hospitals/:id/tier', auth, superOnly, (req, res) => {
+  const h = hospitalById(req.params.id); if (!h) return res.status(404).json({ error: 'Hospital not found' });
+  const t = req.body && req.body.tier; if (!TIERS[t]) return res.status(400).json({ error: 'Unknown plan' });
+  h.subscription = Object.assign({ status: 'active', since: Date.now() }, h.subscription, { tier: t });
+  h.modules = Object.assign({}, TIERS[t].modules);
+  logAudit('MediCore HQ', 'hospital.tier', h.name + ' -> ' + t); store.save(); res.json(h);
+});
+app.post('/api/super/hospitals/:id/status', auth, superOnly, (req, res) => {
+  const h = hospitalById(req.params.id); if (!h) return res.status(404).json({ error: 'Hospital not found' });
+  const s = req.body && req.body.status; if (!['active', 'trial', 'suspended'].includes(s)) return res.status(400).json({ error: 'bad status' });
+  h.subscription = Object.assign({ tier: 'hospital' }, h.subscription, { status: s });
+  logAudit('MediCore HQ', 'hospital.status', h.name + ' -> ' + s); store.save(); res.json(h);
 });
 
 /* ============================================================
