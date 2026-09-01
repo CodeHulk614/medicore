@@ -1,0 +1,242 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>MediCore Front Desk</title>
+<meta name="theme-color" content="#6D5AE0">
+<link rel="manifest" href="/frontdesk.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/icons/frontoffice-192.png">
+<style>
+:root{--teal:#15707A;--teal-soft:#DCEcEC;--gold:#E9B23C;--gold-soft:#FBEFD3;--coral:#DF5039;--coral-soft:#FBE5E0;--ink:#0C2A2E;--muted:#5E7678;--faint:#8AA0A2;--line:#E4EBEB;--bg:#F5F8F8;--surface:#FFFFFF;--surface-2:#EDF3F3;--fd:'Spectral',Georgia,serif;--ok:#15A88A}
+[data-theme=dark]{--ink:#EAF2F2;--muted:#9DB3B4;--faint:#7C9294;--line:#22383B;--bg:#0A1618;--surface:#0F2023;--surface-2:#13292C;--teal-soft:#12343A}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.wrap{max-width:520px;margin:0 auto;min-height:100vh;position:relative}
+#header{position:sticky;top:0;z-index:40;background:var(--bg);padding:12px 18px 6px}
+.topbar{display:flex;align-items:center;gap:10px}
+.tb-title{font-family:var(--fd);font-weight:600;font-size:1.3rem;flex:1}
+.tb-actions{display:flex;gap:6px;margin-left:auto}
+.tb-btn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.screen-wrap{padding:4px 18px 120px}
+.greeting{margin:6px 0 2px}.greeting .hello{font-family:var(--fd);font-weight:600;font-size:1.75rem;line-height:1.05}.greeting .sub{color:var(--muted);font-size:.92rem;margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.section-h{display:flex;align-items:center;margin:18px 2px 10px}.section-h h2{font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin:0;font-weight:700}.section-h .more{margin-left:auto;color:var(--teal);font-size:.85rem;font-weight:600;cursor:pointer}
+.qa-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.stat .n{font-size:1.8rem;font-weight:800;font-family:var(--fd);color:var(--teal)}.stat .l{font-size:.82rem;color:var(--muted);margin-top:2px}
+.btn{border:none;border-radius:13px;padding:13px 16px;font-weight:700;font-size:.92rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:var(--teal);color:#fff}.btn-gold{background:var(--gold);color:#3a2a06}.btn-line{background:var(--surface);border:1px solid var(--line);color:var(--ink)}.btn-coral{background:var(--coral);color:#fff}.btn-block{display:flex;width:100%}
+.field{margin-bottom:12px}.field label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font-family:inherit;font-size:.95rem}
+.row{display:flex;align-items:center;gap:12px}.grow{flex:1;min-width:0}.between{justify-content:space-between}
+.pill{padding:4px 10px;border-radius:999px;font-size:.74rem;font-weight:700}
+.pill.grey{background:var(--surface-2);color:var(--muted)}.pill.gold{background:var(--gold-soft);color:#8a6b12}.pill.coral{background:var(--coral-soft);color:var(--coral)}.pill.teal{background:var(--teal-soft);color:var(--teal)}.pill.ok{background:#DBF4EC;color:#0d7a5f}
+.avatar{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-weight:800;background:var(--teal-soft);color:var(--teal)}.avatar.sm{width:38px;height:38px;border-radius:11px;font-size:.85rem}.avatar.lg{width:60px;height:60px;border-radius:18px;font-size:1.2rem}
+.k{font-weight:700}.mini{font-size:.82rem;color:var(--muted)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;pointer-events:none;padding:0 14px calc(10px + env(safe-area-inset-bottom))}.tabbar-inner{pointer-events:auto;width:100%;max-width:492px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:0 6px 20px rgba(12,42,46,.12);display:flex;padding:8px 8px;gap:2px}
+.tab{flex:1;background:none;border:none;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.68rem;font-weight:600;cursor:pointer;padding:4px}.tab.on{color:var(--teal)}
+.lrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.lrow:last-child{border-bottom:none}
+.empty{text-align:center;color:var(--muted);padding:34px 10px}.empty .t{font-weight:700;color:var(--ink);margin-bottom:4px}
+.lock{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;justify-content:center;padding:30px;max-width:520px;margin:0 auto}
+.toast-wrap{position:fixed;left:0;right:0;bottom:100px;z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 18px}
+.toast{background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:.88rem;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60;opacity:0;pointer-events:none;transition:opacity .2s}.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--surface);border-radius:22px 22px 0 0;padding:20px 20px calc(24px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:88vh;overflow:auto}.sheet.on{transform:translateY(0)}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.chip-row{display:flex;gap:8px;flex-wrap:wrap}
+.selchip{padding:8px 12px;border-radius:11px;border:1px solid var(--line);background:var(--surface);font-size:.85rem;font-weight:600;cursor:pointer;color:var(--ink)}.selchip.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--coral);display:inline-block}
+.swatch{width:30px;height:30px;border-radius:9px;cursor:pointer;border:2px solid transparent}.swatch.on{border-color:var(--ink)}
+</style></head>
+<body><div class="wrap">
+<div class="lock" id="lock">
+  <div style="font-family:var(--fd);font-weight:600;font-size:2rem;margin-bottom:4px">MediCore</div>
+  <div style="color:var(--muted);margin-bottom:26px">Front Desk & Patient Services</div>
+  <div class="field"><label>Work email</label><input id="email" type="email" placeholder="reception@demo.ng" autocomplete="username"></div>
+  <div class="field"><label>Password</label><input id="pass" type="password" placeholder="demo1234" autocomplete="current-password"></div>
+  <div id="authErr" style="color:var(--coral);font-size:.85rem;min-height:18px;margin-bottom:6px"></div>
+  <button class="btn btn-primary btn-block" id="authBtn" onclick="signIn()">Sign in</button>
+  <div class="mini" style="margin-top:16px;text-align:center">reception@ · cashier@ · records@ · cs@ · frontdesk@ · all demo1234</div>
+</div>
+
+<div id="app" style="visibility:hidden"><div id="header"></div><div class="screen-wrap"><div id="view"></div></div></div>
+<div class="tabbar" id="tabbar" style="display:none"><div class="tabbar-inner" id="tabbarInner"></div></div>
+<div class="scrim" id="scrim" onclick="closeSheet()"></div><div class="sheet" id="sheet"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/refresh.js"></script>
+<script src="/clockgate.js"></script>
+<script>
+'use strict';
+const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} return ''; })();const $=id=>document.getElementById(id);
+const I={chart:'M4 20V10M10 20V4M16 20v-7M20 20H2',user:'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0',clock:'M12 7v5l3 2M12 21a9 9 0 100-18 9 9 0 000 18',pin:'M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM12 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5',plus:'M12 5v14M5 12h14',search:'M21 21l-4.3-4.3M11 18a7 7 0 100-14 7 7 0 000 14',cash:'M3 6h18v12H3zM12 15a3 3 0 100-6 3 3 0 000 6',heart:'M12 21C7 17 4 13.5 4 9.5A4.5 4.5 0 0112 6a4.5 4.5 0 018 3.5C20 13.5 17 17 12 21z',check:'M20 6L9 17l-5-5',moon:'M21 12.8A9 9 0 1111.2 3 7 7 0 0021 12.8z',bell:'M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0',out:'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',steth:'M6 3v6a5 5 0 0010 0V3M18 14a3 3 0 100 6 3 3 0 000-6z'};
+function svg(p,s=22){return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p.split('M').filter(Boolean).map(d=>'<path d="M'+d+'"/>').join('')}</svg>`}
+let TOKEN=null;try{TOKEN=localStorage.getItem('mcfd:token')}catch(e){}
+async function api(path,opts){opts=opts||{};const h=Object.assign({'Content-Type':'application/json'},opts.headers||{});if(TOKEN)h.Authorization='Bearer '+TOKEN;const r=await fetch(API+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Request failed ('+r.status+')'));return d}
+async function signIn(){const email=$('email').value.trim().toLowerCase(),password=$('pass').value;$('authBtn').textContent='Signing in...';try{const r=await api('/api/auth/login',{method:'POST',body:{email,password}});TOKEN=r.token;try{localStorage.setItem('mcfd:token',TOKEN)}catch(e){}await boot()}catch(e){$('authErr').textContent=e.message;$('authBtn').textContent='Sign in';TOKEN=null;try{localStorage.removeItem('mcfd:token')}catch(e){}}}
+function logout(){TOKEN=null;try{localStorage.removeItem('mcfd:token')}catch(e){}location.reload()}
+
+let theme='light';function toggleTheme(){theme=theme==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',theme);try{localStorage.setItem('mcfd-theme',theme)}catch(e){}render()}
+(function(){try{const s=localStorage.getItem('mcfd-theme');if(s)theme=s;const a=localStorage.getItem('mcfd-accent');if(a)document.documentElement.style.setProperty('--teal',a)}catch(e){}document.documentElement.setAttribute('data-theme',theme)})();
+function setAccent(c){document.documentElement.style.setProperty('--teal',c);try{localStorage.setItem('mcfd-accent',c)}catch(e){}render()}
+
+let state={tab:null,stack:[]};let TABS=[];const SCREENS={};
+let OV={me:{permissions:[]},today:{}},SHIFT={open:null,todayMinutes:0},QUEUE=[];
+function can(p){return (OV.me.permissions||[]).includes(p)}
+
+async function boot(){ try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'frontdesk',onIn:function(){ boot(); }}); }catch(e){}
+  SHIFT=await api('/api/shift/me');
+  if(!SHIFT.open){renderClockGate();return}
+  await enterApp();
+}
+function renderClockGate(){
+  $('lock').style.display='none';$('app').style.visibility='visible';$('tabbar').style.display='none';
+  $('header').innerHTML='';
+  $('view').innerHTML=`<div style="padding:40px 4px">
+    <div class="greeting"><div class="hello">Good day.</div><div class="sub">Clock in to start your shift. Your time and location are recorded.</div></div>
+    <div class="card" style="text-align:center;padding:26px">
+      <div class="avatar lg" style="margin:0 auto 14px">${svg(I.clock,26)}</div>
+      <div class="k" style="font-size:1.05rem;margin-bottom:4px">Start of shift</div>
+      <div class="mini" id="clockNote" style="margin-bottom:16px">We'll capture your current location to confirm you're on-site.</div>
+      <button class="btn btn-primary btn-block" id="clockBtn" onclick="doClockIn()">${svg(I.pin,18)} Clock in now</button>
+    </div>
+    <button class="btn btn-line btn-block" onclick="logout()">Not you? Log out</button></div>`;
+}
+function doClockIn(){const note=$('clockNote'),btn=$('clockBtn');btn.textContent='Getting your location...';
+  const send=(lat,lng,acc)=>api('/api/shift/clockin',{method:'POST',body:{lat,lng,accuracy:acc}}).then(async r=>{SHIFT={open:r.shift,todayMinutes:0};toast(r.shift.onSite===false?'Clocked in (off-site)':'Clocked in on-site');await enterApp()}).catch(e=>{toast(e.message);btn.textContent='Clock in now'});
+  if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>send(p.coords.latitude,p.coords.longitude,Math.round(p.coords.accuracy)),()=>{if(note)note.textContent='Location unavailable; clocking in without it.';send(null,null,null)},{enableHighAccuracy:true,timeout:8000})}
+  else send(null,null,null);
+}
+async function clockOut(){try{await api('/api/shift/clockout',{method:'POST'});toast('Clocked out. Have a good day.');if(window.mcClockGate){mcClockGate.check();}else{renderClockGate&&renderClockGate();}}catch(e){toast(e.message)}}
+
+async function load(){OV=await api('/api/frontdesk/overview');try{if(can('queue.manage'))QUEUE=await api('/api/frontdesk/queue')}catch(e){}}
+async function enterApp(){
+  $('lock').style.display='none';$('app').style.visibility='visible';$('tabbar').style.display='flex';
+  await load();
+  TABS=[{id:'dash',lab:'Desk',ic:I.chart}];
+  if(can('patient.read')||can('queue.manage'))TABS.push({id:'reception',lab:'Reception',ic:I.user});
+  if(can('billing.manage'))TABS.push({id:'cashier',lab:'Cashier',ic:I.cash});
+  if(can('cs.manage'))TABS.push({id:'care',lab:'Care',ic:I.heart});
+  TABS.push({id:'me',lab:'Me',ic:I.user});
+  state.tab='dash';render();startPoll();
+}
+let poll=null;function startPoll(){if(poll)return;poll=setInterval(async()=>{try{await load();if(state.stack.length)return;if(state.tab==='dash')paintDash();else if(state.tab==='reception')paintQueue()}catch(e){}},4000)}
+
+function render(){
+  const cur=state.stack.length?state.stack[state.stack.length-1]:{screen:state.tab};
+  const S=SCREENS[cur.screen]||SCREENS[state.tab];
+  $('header').innerHTML=state.stack.length?`<div class="topbar"><button class="tb-btn" onclick="back()">‹</button><div class="tb-title">${S.title||''}</div></div>`
+    :`<div class="topbar"><div class="tb-title">${TABS.find(t=>t.id===cur.screen)?.lab||''}</div><div class="tb-actions">${SHIFT.open?`<span class="pill ${SHIFT.open.onSite===false?'gold':'ok'}" style="align-self:center">${SHIFT.open.onSite===false?'Off-site':'On-site'}</span>`:''}<button class="tb-btn" onclick="toggleTheme()">${svg(I.moon,18)}</button></div></div>`;
+  mcView(S.body(cur.arg));
+  $('tabbarInner').innerHTML=TABS.map(t=>`<button class="tab ${state.tab===t.id?'on':''}" onclick="switchTab('${t.id}')">${svg(t.ic,20)}<span>${t.lab}</span></button>`).join('');
+  if(S.after)S.after(cur.arg);
+}
+function switchTab(t){state.tab=t;state.stack=[];render();window.scrollTo(0,0)}
+function go(s,arg){state.stack.push({screen:s,arg});render();window.scrollTo(0,0)}
+function back(){state.stack.pop();render();window.scrollTo(0,0)}
+function toast(m){const w=$('toastWrap'),t=document.createElement('div');t.className='toast';t.textContent=m;w.appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300)},2200)}
+function openSheet(h){$('sheet').innerHTML=h;$('sheet').classList.add('on');$('scrim').classList.add('on')}
+function closeSheet(){$('sheet').classList.remove('on');$('scrim').classList.remove('on')}
+
+/* -------- DASHBOARD -------- */
+SCREENS.dash={body(){const t=OV.today||{};
+  return `<div class="greeting"><div class="hello">${OV.me.hospital||'Front desk'}.</div><div class="sub">${OV.me.name} · ${OV.me.roleLabel}</div></div>
+  <div id="dashStats" class="qa-grid" style="margin-top:14px">${dashStatsHTML()}</div>
+  ${can('queue.manage')?`<div class="section-h"><h2>Waiting room</h2><span class="more" onclick="switchTab('reception')">Open</span></div><div id="dashQueue">${queuePreview()}</div>`:''}
+  ${(OV.onDuty)?`<div class="section-h"><h2>On duty now</h2></div><div class="card" style="padding:8px 16px">${OV.onDuty.map(s=>`<div class="lrow"><div class="avatar sm">${initials(s.name)}</div><div class="grow"><div class="k">${s.name}</div><div class="mini">${s.role} · in ${fmtSince(s.clockIn)} · ${s.onSite===false?'off-site':'on-site'}</div></div>${s.onSite===false?'<span class="pill gold">off-site</span>':'<span class="pill ok">on-site</span>'}</div>`).join('')||'<div class="mini" style="padding:8px 0">No one else clocked in.</div>'}</div>`:''}`;
+},after(){}};
+function dashStatsHTML(){const t=OV.today||{};return `
+  <div class="stat"><div class="n">${t.waiting||0}</div><div class="l">Waiting now</div></div>
+  <div class="stat"><div class="n">${t.inProgress||0}</div><div class="l">With a doctor</div></div>
+  <div class="stat"><div class="n">${t.checkedIn||0}</div><div class="l">Checked in today</div></div>
+  <div class="stat"><div class="n">${t.seen||0}</div><div class="l">Seen today</div></div>`}
+function queuePreview(){if(!QUEUE.length)return `<div class="card"><div class="mini">No one waiting.</div></div>`;return QUEUE.slice(0,3).map(qCard).join('')}
+function paintDash(){const s=$('dashStats');if(s)mcMorph(s,dashStatsHTML());const q=$('dashQueue');if(q)mcMorph(q,queuePreview())}
+
+/* -------- RECEPTION -------- */
+SCREENS.reception={body(){
+  return `<div style="margin-top:8px"></div>
+  <div class="row" style="gap:8px;margin-bottom:12px">
+    <input id="psearch" placeholder="Search patient by name / hospital no / phone" style="flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)" oninput="searchPatients()">
+    ${can('patient.register')?`<button class="btn btn-line" onclick="registerSheet()">${svg(I.plus,18)}</button>`:''}
+  </div>
+  <div id="searchRes"></div>
+  ${can('patient.register')?'<div id="transfersBox"></div>':''}
+  ${can('queue.manage')?`<div class="section-h"><h2>Waiting room (${QUEUE.length})</h2></div><div id="qList">${QUEUE.length?QUEUE.map(qCard).join(''):'<div class="card"><div class="mini">No one waiting. Search a patient to check them in.</div></div>'}</div>`:''}`;
+},after(){ if(typeof loadTransfers==='function') loadTransfers(); }};
+let searchT=null;
+function searchPatients(){clearTimeout(searchT);searchT=setTimeout(async()=>{const q=$('psearch').value.trim();const res=$('searchRes');if(!q){res.innerHTML='';return}try{const list=await api('/api/frontdesk/patients?q='+encodeURIComponent(q));res.innerHTML=list.length?list.map(p=>{const action=p.unattached?(can('patient.register')?`<button class="btn btn-primary" style="padding:9px 13px;background:var(--gold);color:#3a2a06" onclick='doAttach("${p.id}")'>Add here</button>`:''):(can('queue.manage')?`<button class="btn btn-primary" style="padding:9px 13px" onclick='checkinSheet(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Check in</button>`:'');return `<div class="card" style="padding:12px"><div class="row"><div class="avatar sm">${initials(p.name)}</div><div class="grow"><div class="k">${p.name} ${p.unattached?'<span class=\"pill gold\" style=\"font-size:.66rem\">unattached</span>':''}</div><div class="mini">${p.hn||''} · ${p.phone||'no phone'} · ${p.hmo||'Self-pay'}</div></div>${action}</div></div>`}).join(''):'<div class="card"><div class="mini">No match. '+(can('patient.register')?'Tap + to register a new patient.':'')+'</div></div>'}catch(e){toast(e.message)}},250)}
+async function doAttach(id){try{await api('/api/frontdesk/attach/'+id,{method:'POST'});toast('Patient added to this hospital');searchPatients();loadTransfers();}catch(e){toast(e.message)}}
+async function loadTransfers(){const box=$('transfersBox');if(!box)return;try{const list=await api('/api/frontdesk/transfers');box.innerHTML=list.length?`<div class="section-h"><h2>Pending removals (${list.length})</h2></div>`+list.map(t=>`<div class="card"><div class="row"><div class="avatar sm soft">${initials(t.name)}</div><div class="grow"><div class="k">${t.name}</div><div class="mini">${t.hn||''} · asked to move hospital</div></div><button class="btn btn-line" style="padding:9px 13px" onclick='approveTransfer("${t.id}")'>Approve removal</button></div></div>`).join(''):''}catch(e){}}
+async function approveTransfer(id){try{await api('/api/frontdesk/transfers/'+id+'/approve',{method:'POST'});toast('Removed. Another hospital can now register them.');loadTransfers();searchPatients();}catch(e){toast(e.message)}}
+function qCard(e){const pcl=e.priority==='emergency'?'coral':(e.priority==='urgent'?'gold':'grey');
+  return `<div class="card" style="padding:13px"><div class="row"><div class="avatar sm" style="background:var(--teal);color:#fff">${e.token}</div><div class="grow"><div class="k">${e.patient}</div><div class="mini">${e.complaint} · waiting ${e.waitedMin}m</div></div><span class="pill ${pcl}">${e.priority}</span></div>
+   <div class="mini" style="margin-top:8px">${e.vitals&&e.vitals.bp?('BP '+e.vitals.bp+'  '):''}${e.vitals&&e.vitals.temp?('Temp '+e.vitals.temp+'°  '):''}${e.status==='in_progress'?'· with '+(e.doctor||'doctor'):''}</div>
+   ${e.status==='waiting'?`<div class="row" style="gap:8px;margin-top:10px"><button class="btn btn-line grow" style="padding:9px" onclick="route('${e.id}','lab')">Send to lab</button><button class="btn btn-line grow" style="padding:9px" onclick="route('${e.id}','cashier')">To cashier</button><button class="btn btn-line grow" style="padding:9px" onclick="route('${e.id}','done')">Done</button></div>`:''}</div>`}
+async function route(id,to){try{await api('/api/frontdesk/queue/'+id+'/route',{method:'POST',body:{to}});QUEUE=await api('/api/frontdesk/queue');paintQueue();toast(to==='done'?'Removed from queue':'Routed to '+to)}catch(e){toast(e.message)}}
+function paintQueue(){const l=$('qList');if(l)mcMorph(l,QUEUE.length?QUEUE.map(qCard).join(''):'<div class="card"><div class="mini">No one waiting.</div></div>');const dq=$('dashQueue');if(dq)mcMorph(dq,queuePreview())}
+function checkinSheet(p){openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:2px">Check in ${p.name}</div><div class="mini" style="margin-bottom:14px">${p.hn||''} · ${p.hmo||'Self-pay'}</div>
+  <div class="field"><label>Chief complaint</label><input id="ciComplaint" placeholder="e.g. Headache and fever, 2 days"></div>
+  <div class="field"><label>Priority</label><div class="chip-row" id="ciPrio">${['routine','urgent','emergency'].map((x,i)=>`<div class="selchip ${i===0?'on':''}" onclick="pickPrio(this,'${x}')">${x}</div>`).join('')}</div></div>
+  <div class="row" style="gap:10px"><div class="field grow"><label>BP</label><input id="viBp" placeholder="120/80"></div><div class="field grow"><label>Temp °C</label><input id="viTemp" placeholder="36.8"></div></div>
+  <div class="row" style="gap:10px"><div class="field grow"><label>Pulse</label><input id="viPulse" placeholder="76"></div><div class="field grow"><label>Weight kg</label><input id="viWeight" placeholder="70"></div></div>
+  <button class="btn btn-primary btn-block" onclick='doCheckin("${p.id}")'>Check in to waiting room</button>`);window._prio='routine'}
+function pickPrio(el,v){document.querySelectorAll('#ciPrio .selchip').forEach(c=>c.classList.remove('on'));el.classList.add('on');window._prio=v}
+async function doCheckin(pid){const body={patientId:pid,complaint:$('ciComplaint').value||'General consultation',priority:window._prio||'routine',vitals:{bp:$('viBp').value,temp:$('viTemp').value,pulse:$('viPulse').value,weight:$('viWeight').value}};try{const e=await api('/api/frontdesk/checkin',{method:'POST',body});QUEUE=await api('/api/frontdesk/queue');closeSheet();$('psearch').value='';$('searchRes').innerHTML='';render();toast('Checked in as '+e.token+'. Doctor notified.')}catch(e){toast(e.message)}}
+function registerSheet(){openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:14px">Register a new patient</div>
+  <div class="row" style="gap:10px"><div class="field grow"><label>First name</label><input id="rFirst"></div><div class="field grow"><label>Last name</label><input id="rLast"></div></div>
+  <div class="field"><label>Phone</label><input id="rPhone" placeholder="0803..."></div>
+  <div class="row" style="gap:10px"><div class="field grow"><label>Sex</label><select id="rSex"><option value="">-</option><option>female</option><option>male</option></select></div><div class="field grow"><label>HMO (optional)</label><input id="rHmo" placeholder="e.g. Avon HMO"></div></div>
+  <button class="btn btn-primary btn-block" onclick="doRegister()">Register patient</button>`)}
+async function doRegister(){const body={first:$('rFirst').value.trim(),last:$('rLast').value.trim(),phone:$('rPhone').value,sex:$('rSex').value,hmo:$('rHmo').value,plan:$('rHmo').value?'HMO':'Self-pay'};if(!body.first||!body.last){toast('Name required');return}try{const p=await api('/api/frontdesk/register',{method:'POST',body});closeSheet();toast('Registered '+p.name);if(can('queue.manage'))checkinSheet(p)}catch(e){toast(e.message)}}
+
+/* -------- CASHIER -------- */
+SCREENS.cashier={body(){return `<div style="margin-top:8px"></div>
+  <input id="csearch" placeholder="Search patient to bill / verify cover" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);margin-bottom:12px" oninput="cashSearch()">
+  <div id="cashRes"></div>`},after(){}};
+let cashT=null;function cashSearch(){clearTimeout(cashT);cashT=setTimeout(async()=>{const q=$('csearch').value.trim();const res=$('cashRes');if(!q){res.innerHTML='';return}try{const list=await api('/api/frontdesk/patients?q='+encodeURIComponent(q));res.innerHTML=list.map(p=>`<div class="card"><div class="row"><div class="avatar sm">${initials(p.name)}</div><div class="grow"><div class="k">${p.name}</div><div class="mini">${p.hn||''} · ${p.hmo||'Self-pay'}</div></div><button class="btn btn-primary" style="padding:9px 13px" onclick='billSheet(${JSON.stringify(p).replace(/'/g,"&#39;")})'>Bill</button></div></div>`).join('')}catch(e){toast(e.message)}},250)}
+async function billSheet(p){let cover={};try{cover=await api('/api/frontdesk/cover/'+p.id)}catch(e){}
+  openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem">${p.name}</div>
+  <div class="card" style="background:${cover.eligible?'var(--teal-soft)':'var(--gold-soft)'};margin:12px 0"><div class="k">${cover.eligible?'HMO cover verified':'No verified cover'}</div><div class="mini" style="margin-top:2px">${cover.hmo||'Self-pay'} ${cover.member?('· '+cover.member):''} · ${cover.note||''}</div></div>
+  <div class="field"><label>Charge for</label><input id="bWhat" value="Consultation"></div>
+  <div class="field"><label>Amount (₦)</label><input id="bAmt" type="number" value="5000"></div>
+  <button class="btn btn-primary btn-block" onclick='doBill("${p.id}",false)' style="margin-bottom:8px">Create bill (unpaid)</button>
+  <button class="btn btn-gold btn-block" onclick='doBill("${p.id}",true)'>Collect payment now</button>`)}
+async function doBill(pid,paid){try{const b=await api('/api/frontdesk/bill',{method:'POST',body:{patientId:pid,what:$('bWhat').value,amount:$('bAmt').value,paid}});closeSheet();toast(paid?('Paid ₦'+b.amount+' · receipt issued'):'Bill created')}catch(e){toast(e.message)}}
+
+/* -------- CARE / CS -------- */
+SCREENS.care={body(){return `<div style="margin-top:8px"></div>
+  <button class="btn btn-primary btn-block" onclick="csSheet()" style="margin-bottom:14px">${svg(I.plus,18)} Log follow-up or complaint</button>
+  <div id="csList"><div class="mini">Loading...</div></div>`},after(){loadCs()}};
+async function loadCs(){try{const list=await api('/api/frontdesk/cs');$('csList').innerHTML=list.length?list.map(c=>`<div class="card" style="padding:13px"><div class="row"><div class="avatar sm" style="background:${c.type==='complaint'?'var(--coral-soft)':'var(--teal-soft)'};color:${c.type==='complaint'?'var(--coral)':'var(--teal)'}">${svg(c.type==='complaint'?I.bell:I.heart,18)}</div><div class="grow"><div class="k">${c.patient}</div><div class="mini">${c.type} · ${c.note||''}</div></div>${c.status==='open'?`<button class="btn btn-line" style="padding:8px 11px" onclick="csClose('${c.id}')">Close</button>`:'<span class="pill ok">closed</span>'}</div></div>`).join(''):'<div class="empty"><div class="t">No cases yet</div><div>Log a follow-up call or a patient complaint.</div></div>'}catch(e){toast(e.message)}}
+function csSheet(){openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:12px">New care case</div>
+  <div class="field"><label>Patient / caller name</label><input id="csName" placeholder="Name"></div>
+  <div class="field"><label>Type</label><div class="chip-row" id="csType">${['followup','complaint'].map((x,i)=>`<div class="selchip ${i===0?'on':''}" onclick="pickCs(this,'${x}')">${x}</div>`).join('')}</div></div>
+  <div class="field"><label>Note</label><textarea id="csNote" rows="3" placeholder="What happened / what to follow up"></textarea></div>
+  <button class="btn btn-primary btn-block" onclick="doCs()">Save case</button>`);window._cs='followup'}
+function pickCs(el,v){document.querySelectorAll('#csType .selchip').forEach(c=>c.classList.remove('on'));el.classList.add('on');window._cs=v}
+async function doCs(){try{await api('/api/frontdesk/cs',{method:'POST',body:{name:$('csName').value,type:window._cs,note:$('csNote').value}});closeSheet();toast('Case logged');loadCs()}catch(e){toast(e.message)}}
+async function csClose(id){try{await api('/api/frontdesk/cs/'+id+'/close',{method:'POST'});toast('Closed');loadCs()}catch(e){toast(e.message)}}
+
+/* -------- ME / PROFILE -------- */
+SCREENS.me={body(){const m=OV.me,sh=SHIFT.open;
+  const accents=['#15707A','#1E6FB5','#7A4FD6','#C0392B','#0E8A6A','#B5651D'];
+  return `<div style="margin-top:8px"></div>
+  <div class="card"><div class="row"><div class="avatar lg">${initials(m.name)}</div><div class="grow"><div style="font-weight:800;font-size:1.1rem">${m.name}</div><div class="mini">${m.roleLabel} · ${m.hospital}</div></div></div>
+    <div class="row between" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><div><div class="mini">Shift</div><div class="k">${sh?('Clocked in '+fmtSince(sh.clockIn)):'Not clocked in'}</div></div>${sh?`<span class="pill ${sh.onSite===false?'gold':'ok'}">${sh.onSite===false?'Off-site':'On-site'}</span>`:''}</div>
+    <div class="mini" style="margin-top:6px">Today: ${fmtMin(SHIFT.todayMinutes)} worked</div>
+    <button class="btn btn-coral btn-block" style="margin-top:12px" onclick="clockOut()">${svg(I.out,18)} Clock out</button></div>
+  <div class="section-h"><h2>Your access</h2></div>
+  <div class="card"><div class="chip-row">${(m.permissions||[]).map(p=>`<span class="pill teal">${p.replace('.',' · ')}</span>`).join('')||'<span class="mini">No special permissions</span>'}</div><div class="mini" style="margin-top:8px">You only see the tools your role allows.</div></div>
+  <div class="section-h"><h2>Appearance</h2></div>
+  <div class="card"><div class="row between"><div class="k">Dark mode</div><button class="btn btn-line" onclick="toggleTheme()">${theme==='dark'?'On':'Off'}</button></div>
+    <div class="k" style="margin-top:14px;margin-bottom:8px">Accent colour</div><div class="row" style="gap:8px">${accents.map(c=>`<span class="swatch ${getComputedStyle(document.documentElement).getPropertyValue('--teal').trim()===c?'on':''}" style="background:${c}" onclick="setAccent('${c}')"></span>`).join('')}</div></div>
+  <button class="btn btn-line btn-block" onclick="logout()">Log out</button>`},after(){}};
+
+function initials(n){return (n||'').split(' ').filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()}
+function fmtSince(ts){const m=Math.round((Date.now()-ts)/60000);return m<60?m+'m ago':Math.floor(m/60)+'h '+(m%60)+'m ago'}
+function fmtMin(m){return m<60?m+' min':Math.floor(m/60)+'h '+(m%60)+'m'}
+
+if(TOKEN){boot().catch(()=>{TOKEN=null;try{localStorage.removeItem('mcfd:token')}catch(e){};$('lock').style.display='flex'})}
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script></body></html>

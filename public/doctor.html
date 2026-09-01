@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0C3237">
+<title>MediCore for Doctors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF2F2; --surface:#FFFFFF; --surface-2:#F4F8F8;
+  --ink:#0C2A2E; --muted:#5E7678; --faint:#93A9AA; --line:#E4EBEB;
+  --teal:#15707A; --teal-ink:#0C3237; --teal-soft:#E2F0F0;
+  --gold:#E9B23C; --gold-deep:#B7841F; --gold-soft:#FBEFD3;
+  --green:#2E9E7B; --green-soft:#E0F1EA;
+  --coral:#DF5039; --coral-soft:#FBE5E0;
+  --shadow-1:0 1px 2px rgba(12,42,46,.05), 0 2px 8px rgba(12,42,46,.05);
+  --shadow-2:0 4px 16px rgba(12,42,46,.10);
+  --shadow-card:0 10px 30px rgba(12,50,55,.14);
+  --fd:'Spectral',Georgia,serif; --fb:'Inter',-apple-system,system-ui,sans-serif;
+  --r:14px; --r-lg:18px; --r-xl:22px;
+}
+html[data-theme="dark"]{
+  --bg:#081416; --surface:#0F2429; --surface-2:#13292E;
+  --ink:#EAF3F2; --muted:#93AEB0; --faint:#5E7B7D; --line:rgba(255,255,255,.08);
+  --teal:#3FB2BB; --teal-ink:#0B2024; --teal-soft:rgba(63,178,187,.14);
+  --gold:#E9B23C; --gold-deep:#E9B23C; --gold-soft:rgba(233,178,60,.14);
+  --green:#3FC79A; --green-soft:rgba(63,199,154,.14);
+  --coral:#F0785F; --coral-soft:rgba(240,120,95,.14);
+  --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 4px 16px rgba(0,0,0,.4);
+  --shadow-card:0 12px 34px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; height:100%}
+body{
+  font-family:var(--fb); background:var(--bg); color:var(--ink);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+  font-size:16px; line-height:1.5;
+}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+input{font-family:inherit}
+.mono{font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+
+/* ---------- app frame ---------- */
+#app{max-width:520px; margin:0 auto; min-height:100%; position:relative}
+.screen-wrap{ padding:0 18px calc(96px + env(safe-area-inset-bottom)); }
+.topbar{
+  position:sticky; top:0; z-index:40; background:var(--bg);
+  padding-top:calc(env(safe-area-inset-top) + 8px);
+  display:flex; align-items:center; gap:12px; min-height:52px;
+}
+.topbar.detail{ padding-bottom:6px; border-bottom:1px solid transparent }
+.tb-back{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--surface); box-shadow:var(--shadow-1) }
+.tb-title{ font-weight:700; font-size:1.08rem; flex:1 }
+.tb-actions{ display:flex; gap:8px; margin-left:auto }
+.tb-btn{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--surface); box-shadow:var(--shadow-1); position:relative }
+.tb-btn .dot{ position:absolute; top:9px; right:9px; width:8px; height:8px; border-radius:50%; background:var(--coral); border:2px solid var(--surface) }
+
+.avatar{ border-radius:50%; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none; overflow:hidden }
+.avatar.lg{ width:56px; height:56px; font-size:1.3rem }
+.avatar.sm{ width:38px; height:38px; font-size:.9rem }
+.avatar.gold{ background:var(--gold); color:#3a2b06 }
+.avatar.soft{ background:var(--teal-soft); color:var(--teal) }
+
+/* large greeting title */
+.greeting{ margin:6px 0 2px }
+.greeting .hello{ font-family:var(--fd); font-weight:600; font-size:1.95rem; line-height:1.05; letter-spacing:-.01em }
+.greeting .sub{ color:var(--muted); font-size:.92rem; margin-top:4px }
+
+.eyebrow{ font-size:.68rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--teal) }
+.eyebrow.gold{ color:var(--gold-deep) } .eyebrow.muted{ color:var(--faint) }
+
+.section-h{ display:flex; align-items:baseline; justify-content:space-between; margin:24px 2px 12px }
+.section-h h2{ font-size:1.06rem; font-weight:700; margin:0 }
+.section-h .more{ color:var(--teal); font-size:.84rem; font-weight:600 }
+
+/* ---------- cards ---------- */
+.card{ background:var(--surface); border-radius:var(--r-lg); padding:16px; box-shadow:var(--shadow-1) }
+.card.flat{ box-shadow:none; border:1px solid var(--line) }
+.tap{ transition:transform .12s ease }
+.tap:active{ transform:scale(.975) }
+
+.row{ display:flex; align-items:center; gap:12px }
+.between{ justify-content:space-between }
+.col{ display:flex; flex-direction:column }
+.grow{ flex:1; min-width:0 }
+.ellip{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.muted{ color:var(--muted) } .faint{ color:var(--faint) }
+.k{ font-weight:600 }
+
+/* status strip (home) */
+.strip{ display:flex; gap:10px; margin-top:16px }
+.strip .chip{ flex:1; background:var(--surface); border-radius:var(--r); padding:12px 12px; box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:2px }
+.strip .chip .lab{ font-size:.68rem; color:var(--faint); font-weight:700; text-transform:uppercase; letter-spacing:.05em }
+.strip .chip .val{ font-weight:700; font-size:.98rem }
+.strip .chip .val.ok{ color:var(--green) }
+
+/* quick actions */
+.qa-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px }
+.qa{ background:var(--surface); border-radius:var(--r); padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:7px; box-shadow:var(--shadow-1) }
+.qa .ic{ width:44px; height:44px; border-radius:13px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center }
+.qa .lab{ font-size:.72rem; font-weight:600; color:var(--ink); text-align:center; line-height:1.1 }
+
+/* list rows */
+.lrow{ display:flex; align-items:center; gap:13px; padding:13px 0; border-bottom:1px solid var(--line) }
+.lrow:last-child{ border-bottom:none }
+.lrow .ic{ width:42px; height:42px; border-radius:12px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; flex:none }
+.lrow .ic.gold{ background:var(--gold-soft); color:var(--gold-deep) }
+.lrow .ic.coral{ background:var(--coral-soft); color:var(--coral) }
+.lrow .ic.green{ background:var(--green-soft); color:var(--green) }
+.lrow .t{ font-weight:600; font-size:.94rem }
+.lrow .s{ color:var(--muted); font-size:.8rem; margin-top:1px }
+.lrow .chev{ color:var(--faint); margin-left:auto; flex:none }
+
+/* menu card (care hub) */
+.menu-card{ background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow-1); padding:4px 16px }
+
+/* pills */
+.pill{ display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:.72rem; font-weight:700 }
+.pill .d{ width:6px; height:6px; border-radius:50%; background:currentColor }
+.pill.green{ background:var(--green-soft); color:var(--green) }
+.pill.gold{ background:var(--gold-soft); color:var(--gold-deep) }
+.pill.coral{ background:var(--coral-soft); color:var(--coral) }
+.pill.teal{ background:var(--teal-soft); color:var(--teal) }
+.pill.grey{ background:var(--surface-2); color:var(--muted) }
+
+/* buttons */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:.94rem; padding:13px 18px; border-radius:var(--r); transition:transform .12s ease, filter .15s }
+.btn:active{ transform:scale(.97) }
+.btn-primary{ background:var(--teal); color:#fff }
+.btn-gold{ background:var(--gold); color:#3a2b06 }
+.btn-soft{ background:var(--teal-soft); color:var(--teal) }
+.btn-ghost{ background:var(--surface-2); color:var(--ink) }
+.btn-line{ background:transparent; border:1.5px solid var(--line); color:var(--ink) }
+.btn-block{ width:100%; padding:15px }
+.btn-lg{ padding:16px 20px; font-size:1rem }
+
+/* health tip */
+.tip{ background:linear-gradient(135deg,#0C3237,#15707A); color:#fff; border-radius:var(--r-lg); padding:18px; position:relative; overflow:hidden }
+.tip .eyebrow{ color:#8FD0D2 }
+.tip h3{ font-family:var(--fd); font-weight:600; font-size:1.15rem; margin:8px 0 4px; line-height:1.15 }
+.tip p{ color:#BFE0E1; font-size:.86rem; margin:0 }
+.tip .orb{ position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:rgba(233,178,60,.18) }
+
+/* ---------- digital ID card (signature) ---------- */
+.idwrap{ perspective:1400px }
+.idcard{ position:relative; width:100%; aspect-ratio:1.586/1; transform-style:preserve-3d; transition:transform .6s cubic-bezier(.3,.7,.3,1); cursor:pointer }
+.idcard.flip{ transform:rotateY(180deg) }
+.idface{ position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--r-xl); overflow:hidden; box-shadow:var(--shadow-card) }
+.idfront{ background:radial-gradient(120% 140% at 0% 0%, #1c7d86 0%, #0C3237 60%, #081f23 100%); color:#fff; padding:18px 20px; display:flex; flex-direction:column }
+.idfront .guilloche{ position:absolute; inset:0; opacity:.5;
+  background-image:repeating-radial-gradient(circle at 80% 20%, rgba(233,178,60,.10) 0 1px, transparent 1px 10px), repeating-linear-gradient(60deg, rgba(255,255,255,.04) 0 1px, transparent 1px 9px); }
+.idfront .top{ display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1 }
+.idfront .brand{ display:flex; align-items:center; gap:8px; font-weight:600; font-family:var(--fd); font-size:1rem }
+.idfront .plan{ font-size:.64rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); background:rgba(233,178,60,.14); padding:4px 9px; border-radius:999px }
+.idfront .who{ position:relative; z-index:1; margin-top:auto }
+.idfront .who .nm{ font-size:1.15rem; font-weight:700; letter-spacing:.01em }
+.idfront .who .no{ font-family:var(--fb); font-variant-numeric:tabular-nums; letter-spacing:.14em; font-size:.82rem; color:#9FC6C8; margin-top:2px }
+.idfront .foot{ position:relative; z-index:1; display:flex; align-items:flex-end; justify-content:space-between; margin-top:12px }
+.idfront .foot .meta{ font-size:.66rem; color:#8FB4B6; line-height:1.5 }
+.idfront .foot .meta b{ color:#DDEDEE; font-weight:600 }
+.qr{ width:62px; height:62px; background:#fff; border-radius:9px; padding:5px }
+.idback{ background:linear-gradient(160deg,#123f45,#0a2a2e); color:#fff; transform:rotateY(180deg); padding:16px 18px; display:flex; flex-direction:column }
+.idback .magstripe{ position:absolute; left:0; right:0; top:16px; height:34px; background:#06181b }
+.idback .bcontent{ margin-top:52px; position:relative; z-index:1 }
+.idback .balrow{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px }
+.idback .balrow .l{ font-size:.78rem; color:#9FC6C8 }
+.idback .balrow .v{ font-weight:700; font-variant-numeric:tabular-nums }
+.flip-hint{ text-align:center; font-size:.74rem; color:var(--faint); margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px }
+
+/* benefit meters */
+.meter{ margin-bottom:16px }
+.meter .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px }
+.meter .name{ font-weight:600; font-size:.9rem }
+.meter .amt{ font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums }
+.track{ height:8px; background:var(--surface-2); border-radius:999px; overflow:hidden }
+.track > div{ height:100%; border-radius:999px; background:var(--teal); transition:width .6s ease }
+.track > div.warn{ background:var(--gold) } .track > div.low{ background:var(--coral) }
+
+/* provider search */
+.searchbar{ display:flex; align-items:center; gap:10px; background:var(--surface); border-radius:var(--r); padding:12px 14px; box-shadow:var(--shadow-1); margin-bottom:14px }
+.searchbar input{ border:none; outline:none; background:transparent; flex:1; font-size:.95rem; color:var(--ink) }
+.searchbar input::placeholder{ color:var(--faint) }
+
+/* record tabs (segmented) */
+.seg{ display:flex; background:var(--surface-2); border-radius:12px; padding:3px; gap:2px; margin:14px 0 4px }
+.seg button{ flex:1; padding:9px 4px; border-radius:9px; font-weight:600; font-size:.82rem; color:var(--muted) }
+.seg button.on{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow-1) }
+
+/* result row with range */
+.range-mini{ height:6px; background:linear-gradient(90deg,var(--coral-soft),var(--green-soft) 30%,var(--green-soft) 70%,var(--coral-soft)); border-radius:999px; position:relative; margin-top:8px }
+.range-mini i{ position:absolute; top:-3px; width:3px; height:12px; background:var(--ink); border-radius:2px; transform:translateX(-50%) }
+.range-mini i.crit{ background:var(--coral) }
+
+/* chat */
+.chat{ display:flex; flex-direction:column; gap:9px; padding:6px 0 4px }
+.bub{ max-width:80%; padding:11px 14px; border-radius:16px; font-size:.9rem; line-height:1.45 }
+.bub.them{ background:var(--surface); align-self:flex-start; border-bottom-left-radius:5px; box-shadow:var(--shadow-1) }
+.bub.me{ background:var(--teal); color:#fff; align-self:flex-end; border-bottom-right-radius:5px }
+.bub .tm{ font-size:.64rem; opacity:.7; margin-top:3px }
+.composer{ position:sticky; bottom:calc(96px + env(safe-area-inset-bottom)); display:flex; gap:8px; padding:8px 0 }
+.composer input{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:12px 16px; outline:none; color:var(--ink); font-size:.92rem }
+.composer .send{ width:46px; height:46px; border-radius:50%; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; flex:none }
+
+/* delivery timeline */
+.tl{ display:flex; flex-direction:column; gap:0; margin-top:6px }
+.tl .step{ display:flex; gap:14px; }
+.tl .rail{ display:flex; flex-direction:column; align-items:center }
+.tl .dot{ width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; background:var(--surface-2); color:var(--faint); flex:none; z-index:1 }
+.tl .dot.done{ background:var(--teal); color:#fff }
+.tl .dot.now{ background:var(--gold); color:#3a2b06; box-shadow:0 0 0 5px var(--gold-soft) }
+.tl .line{ width:2px; flex:1; background:var(--line) }
+.tl .line.done{ background:var(--teal) }
+.tl .step .body{ padding-bottom:22px }
+.tl .step:last-child .body{ padding-bottom:0 }
+.tl .step .body .t{ font-weight:600; font-size:.92rem }
+.tl .step .body .s{ color:var(--muted); font-size:.78rem }
+
+/* video screen */
+.video-stage{ background:linear-gradient(150deg,#0C3237,#15707A); border-radius:var(--r-xl); aspect-ratio:3/4; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden }
+.video-stage .self{ position:absolute; right:12px; bottom:12px; width:84px; height:112px; border-radius:14px; background:#04171a; border:2px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; color:#6f9799; font-size:.72rem }
+.video-stage .live{ position:absolute; top:14px; left:14px; background:rgba(223,80,57,.92); color:#fff; font-size:.68rem; font-weight:800; padding:5px 11px; border-radius:999px; letter-spacing:.04em }
+.vcontrols{ display:flex; gap:14px; justify-content:center; margin-top:16px }
+.vbtn{ width:56px; height:56px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-1); display:flex; align-items:center; justify-content:center }
+.vbtn.end{ background:var(--coral); color:#fff }
+
+/* empty state */
+.empty{ text-align:center; padding:52px 20px; color:var(--muted) }
+.empty .ic{ width:64px; height:64px; border-radius:20px; background:var(--surface); box-shadow:var(--shadow-1); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; color:var(--teal) }
+.empty .t{ font-weight:700; color:var(--ink); margin-bottom:4px }
+
+/* skeleton */
+.sk{ background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%); background-size:400% 100%; animation:sh 1.3s ease infinite; border-radius:10px }
+@keyframes sh{ 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+
+/* ---------- bottom island tab bar ---------- */
+.tabbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  display:flex; justify-content:center; pointer-events:none;
+  padding:0 14px calc(10px + env(safe-area-inset-bottom));
+}
+.tabbar-inner{
+  pointer-events:auto; width:100%; max-width:492px;
+  background:var(--surface); border-radius:var(--r-xl);
+  box-shadow:var(--shadow-2), 0 0 0 1px var(--line);
+  display:flex; padding:8px 8px; gap:2px;
+  backdrop-filter:saturate(1.4);
+}
+.tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 2px; border-radius:14px; color:var(--faint); transition:color .18s, background .18s }
+.tab .lab{ font-size:.64rem; font-weight:700; letter-spacing:.01em }
+.tab.on{ color:var(--teal); background:var(--teal-soft) }
+.tab:active{ transform:scale(.94) }
+
+/* ---------- bottom sheet ---------- */
+.scrim{ position:fixed; inset:0; background:rgba(6,20,22,.5); z-index:60; opacity:0; pointer-events:none; transition:opacity .25s }
+.scrim.on{ opacity:1; pointer-events:auto }
+.sheet{ position:fixed; left:0; right:0; bottom:0; z-index:61; background:var(--surface); border-radius:22px 22px 0 0; padding:8px 20px calc(24px + env(safe-area-inset-bottom)); box-shadow:0 -10px 40px rgba(0,0,0,.2); transform:translateY(110%); transition:transform .3s cubic-bezier(.3,.8,.3,1); max-width:520px; margin:0 auto }
+.sheet.on{ transform:translateY(0) }
+.sheet .grab{ width:40px; height:4px; border-radius:999px; background:var(--line); margin:8px auto 14px }
+.sheet h3{ font-size:1.15rem; margin:0 0 4px }
+.field{ margin:14px 0 }
+.field label{ display:block; font-size:.78rem; font-weight:700; color:var(--muted); margin-bottom:6px }
+.field .inp, .field select{ width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:13px 14px; font-size:.95rem; color:var(--ink); outline:none }
+.opt-row{ display:flex; gap:8px; flex-wrap:wrap }
+.opt{ padding:11px 14px; border-radius:12px; background:var(--surface-2); font-weight:600; font-size:.88rem; border:1.5px solid transparent }
+.opt.on{ border-color:var(--teal); background:var(--teal-soft); color:var(--teal) }
+
+/* toast */
+.toast-wrap{ position:fixed; left:0; right:0; bottom:calc(104px + env(safe-area-inset-bottom)); z-index:80; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; padding:0 18px }
+.toast{ background:var(--teal-ink); color:#fff; padding:12px 16px; border-radius:14px; font-size:.86rem; font-weight:500; box-shadow:var(--shadow-2); display:flex; align-items:center; gap:9px; max-width:100%; animation:tin .3s ease }
+.toast .ic{ color:var(--gold) }
+@keyframes tin{ from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:translateY(0)} }
+
+/* ---------- lock screen ---------- */
+#lock{ position:fixed; inset:0; z-index:100; background:radial-gradient(120% 100% at 50% 0%, #15707A 0%, #0C3237 55%, #071e21 100%); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; transition:opacity .4s, transform .4s }
+#lock.hide{ opacity:0; transform:scale(1.04); pointer-events:none }
+#lock .mark{ width:66px; height:66px; border-radius:20px; border:2px solid var(--gold); display:flex; align-items:center; justify-content:center; margin-bottom:18px }
+#lock .nm{ font-family:var(--fd); font-weight:600; font-size:1.7rem }
+#lock .tag{ color:#8FD0D2; font-size:.82rem; margin-top:4px; margin-bottom:44px }
+#lock .bio{ width:76px; height:76px; border-radius:50%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; color:var(--gold); transition:transform .15s }
+#lock .bio:active{ transform:scale(.92) }
+#lock .hint{ color:#9FC6C8; font-size:.86rem; margin-top:16px }
+.lock-title{ font-size:1.02rem; color:#DDEDEE; font-weight:500; text-align:center; min-height:24px }
+.pin-dots{ display:flex; gap:16px; margin:22px 0 30px }
+.pin-dots .pd{ width:13px; height:13px; border-radius:50%; border:2px solid rgba(255,255,255,.38); transition:.15s }
+.pin-dots .pd.on{ background:var(--gold); border-color:var(--gold); transform:scale(1.1) }
+#lock.shake{ animation:shk .42s }
+@keyframes shk{ 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-9px)} 40%,80%{transform:translateX(9px)} }
+.keypad{ display:grid; grid-template-columns:repeat(3,70px); gap:18px; justify-content:center }
+.keypad button{ width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:#fff; font-size:1.5rem; font-weight:500; display:flex; align-items:center; justify-content:center; transition:transform .1s, background .15s }
+.keypad button:active{ transform:scale(.9); background:rgba(255,255,255,.2) }
+.keypad button.blank{ background:none; border:none; pointer-events:none }
+.lock-reset{ color:#8FD0D2; font-size:.82rem; margin-top:26px; text-decoration:underline; background:none }
+.authinp{ width:100%; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:14px 16px; color:#fff; font-size:.95rem; margin-bottom:10px; outline:none }
+.authinp::placeholder{ color:#8FB4B6 }
+.autherr{ color:#F0967f; font-size:.82rem; min-height:18px; margin:2px 0 6px }
+.authswitch{ text-align:center; margin-top:18px; color:#9FC6C8; font-size:.86rem }
+.authswitch button{ color:var(--gold); font-weight:600; background:none; text-decoration:underline }
+
+.screen{ animation:pop .28s ease }
+@keyframes pop{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+:focus-visible{ outline:2px solid var(--teal); outline-offset:2px }
+</style>
+<style>
+.docbadge{ position:absolute; top:calc(env(safe-area-inset-top) + 16px); right:18px; background:var(--gold-soft); color:var(--gold-deep); font-size:.64rem; font-weight:800; letter-spacing:.08em; padding:5px 10px; border-radius:999px }
+.stat{ background:var(--surface); border-radius:var(--r-lg); padding:16px; box-shadow:var(--shadow-1); text-align:center }
+.stat .n{ font-size:1.5rem; font-weight:700; font-family:var(--fd) }
+.stat .l{ font-size:.72rem; color:var(--muted); font-weight:600; margin-top:2px }
+.toggle{ width:48px; height:28px; border-radius:999px; background:var(--line); position:relative; transition:.2s; flex:none }
+.toggle.on{ background:var(--green) }
+.toggle::after{ content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2) }
+.toggle.on::after{ left:23px }
+</style>
+<link rel="manifest" href="/doctor.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+<div id="lock">
+  <div class="mark"><svg width="34" height="34" viewBox="0 0 48 48"><path d="M8 26 h8 l4 -11 l6 22 l4 -14 l3 3 h7" fill="none" stroke="#E9B23C" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  <div class="nm">MediCore</div>
+  <div class="tag" style="margin-bottom:22px">for Doctors</div>
+  <div id="authForm" style="width:100%;max-width:340px">
+    <div class="lock-title" id="authTitle" style="margin-bottom:16px">Sign in</div>
+    <input id="authEmail" class="authinp" placeholder="Email" autocapitalize="off" autocorrect="off" value="ada@demo.ng">
+    <input id="authPass" class="authinp" type="password" placeholder="Password" value="demo1234">
+    <div id="authErr" class="autherr"></div>
+    <button class="btn btn-gold btn-block btn-lg tap" id="authBtn" onclick="submitAuth()">Sign in</button>
+    <div class="authswitch" style="margin-top:14px">Demo doctors: ada, tunde, ifeoma, musa, chidinma, bisi @demo.ng</div>
+  </div>
+</div>
+
+<div id="app" style="visibility:hidden">
+  <div id="header"></div>
+  <div class="screen-wrap"><div id="view"></div></div>
+</div>
+<div class="tabbar" id="tabbar" style="display:none"><div class="tabbar-inner" id="tabbarInner"></div></div>
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/rtc.js"></script>
+<script src="/refresh.js"></script>
+<script src="/clockgate.js"></script>
+<script>
+'use strict';
+const I = {
+  home:'M3 10.5 12 3l9 7.5M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5',
+  cal:'M8 3v3M16 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  people:'M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM17 11a3 3 0 1 0 0-6M21 20v-1a4 4 0 0 0-3-3.8',
+  chat:'M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z',
+  user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0',
+  chev:'M9 6l6 6-6 6', back:'M15 18l-6-6 6-6', x:'M6 6l12 12M18 6 6 18', check:'M20 6 9 17l-5-5',
+  video:'M15 10.5 21 7v10l-6-3.5M3 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  clock:'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  cash:'M3 6h18v12H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  logout:'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  star:'M12 3l2.9 6 6.1.9-4.5 4.3 1.1 6.3L12 17.8 6.4 20.5l1.1-6.3L3 9.9 9.1 9z',
+  moon:'M21 12.8A8 8 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z', refresh:'M21 12a9 9 0 1 1-3-6.7L21 8M21 4v4h-4',
+};
+const svg=(p,w)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="${w||22}" height="${w||22}" stroke-linecap="round" stroke-linejoin="round">${p.split('M').filter(Boolean).map(s=>`<path d="M${s}"/>`).join('')}</svg>`;
+const ngn=n=>'\u20a6'+(n||0).toLocaleString('en-NG');
+const $=id=>document.getElementById(id);
+
+const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} const q=new URLSearchParams(location.search).get('api'); if(q) return q; if(location.protocol.startsWith('http')) return location.origin; return 'http://localhost:4000'; })();
+let TOKEN=null; try{ TOKEN=localStorage.getItem('mcd:token'); }catch(e){}
+async function api(path,opts){ opts=opts||{}; const h=Object.assign({'Content-Type':'application/json'},opts.headers||{}); if(TOKEN)h.Authorization='Bearer '+TOKEN; const r=await fetch(API+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error||('Request failed ('+r.status+')')); return d; }
+
+async function submitAuth(){
+  const email=$('authEmail').value.trim(), password=$('authPass').value; $('authErr').textContent=''; $('authBtn').textContent='Signing in...';
+  try{ const r=await api('/api/auth/login',{method:'POST',body:{email,password}}); TOKEN=r.token; try{localStorage.setItem('mcd:token',TOKEN);}catch(e){}
+    const me=await api('/api/doc/me'); if(!me.doctor){ throw new Error('This is a doctor app. Use a doctor account.'); }
+    DOC=me; await enterApp();
+  }catch(e){ $('authErr').textContent=e.message; $('authBtn').textContent='Sign in'; TOKEN=null; try{localStorage.removeItem('mcd:token');}catch(e){} }
+}
+let DOC=null, D={ schedule:[], patients:[] };
+let hbTimer=null, dpoll=null, DCUR=null;
+function startHeartbeat(){ if(hbTimer) return; const beat=()=>api('/api/presence/ping',{method:'POST',body:{}}).catch(()=>{}); beat(); hbTimer=setInterval(beat,15000); }
+async function enterApp(){ startHeartbeat(); startSpinePoll(); try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'doctor',onIn:function(){ enterApp(); }}); }catch(e){}
+  $('lock').classList.add('hide'); setTimeout(()=>{$('lock').style.display='none';},420);
+  $('app').style.visibility='visible'; $('tabbar').style.display='flex';
+  await reload(); go('home',null,true);
+}
+async function reload(){ const [me,sch,pats,orders,notif,queue,shift]=await Promise.all([api('/api/doc/me'),api('/api/doc/schedule'),api('/api/doc/patients'),api('/api/doc/orders').catch(()=>[]),api('/api/notifications').catch(()=>({items:[],unread:0})),api('/api/doc/queue').catch(()=>[]),api('/api/shift/me').catch(()=>({open:null}))]); DOC=me; D.schedule=sch; D.patients=pats; D.orders=orders; D.notif=notif; D.queue=queue; D.shift=shift; }
+let spinePoll=null;
+function startSpinePoll(){ if(spinePoll)return; spinePoll=setInterval(async()=>{ try{ const [orders,notif,queue]=await Promise.all([api('/api/doc/orders'),api('/api/notifications'),api('/api/doc/queue').catch(()=>[])]); D.orders=orders; D.notif=notif; D.queue=queue; if(!state.stack.length && state.tab==='home') render(); }catch(e){} },5000); }
+function logout(){ TOKEN=null; try{localStorage.removeItem('mcd:token');}catch(e){} location.reload(); }
+
+
+const TABS=[{id:'home',lab:'Today',ic:I.home},{id:'sched',lab:'Schedule',ic:I.cal},{id:'chats',lab:'Chats',ic:I.chat},{id:'patients',lab:'Patients',ic:I.people},{id:'me',lab:'Me',ic:I.user}];
+let state={tab:'home',stack:[]};
+function switchTab(t){ state.tab=t; state.stack=[]; render(); window.scrollTo(0,0); }
+function go(s,arg,root){ if(root)state.stack=[]; else state.stack.push({screen:s,arg}); render(); window.scrollTo(0,0); }
+function back(){ state.stack.pop(); render(); window.scrollTo(0,0); }
+function render(){
+  const cur=state.stack.length?state.stack[state.stack.length-1]:{screen:state.tab};
+  const S=SCREENS[cur.screen]||SCREENS[state.tab];
+  $('header').innerHTML= state.stack.length?`<div class="topbar detail"><button class="tb-back" onclick="back()">${svg(I.back,22)}</button><div class="tb-title">${S.title||''}</div></div>`
+    : `<div class="topbar"><div class="tb-title" style="font-size:1.35rem;font-family:var(--fd);font-weight:600">${({home:'Today',sched:'Schedule',patients:'Patients',me:'My practice'})[cur.screen]||''}</div><div class="tb-actions"><button class="tb-btn" onclick="toggleTheme()">${svg(I.moon,20)}</button></div></div>`;
+  mcView(`<div class="screen">${S.body(cur.arg)}</div>`);
+  $('tabbarInner').innerHTML=TABS.map(t=>`<button class="tab ${state.tab===t.id?'on':''}" onclick="switchTab('${t.id}')">${svg(t.ic,22)}<span class="lab">${t.lab}</span></button>`).join('');
+  if(S.after)S.after(cur.arg);
+}
+const SCREENS={};
+/* ---- live chats (threads) ---- */
+let DTHREADS=[];
+async function loadDThreads(){ try{ DTHREADS=await api('/api/doc/threads'); }catch(e){ DTHREADS=[]; } }
+SCREENS.chats={ body(){
+  return `<div style="margin-top:8px"></div><div id="dThreadList"><div class="muted" style="font-size:.85rem;padding:20px 0;text-align:center">Loading...</div></div>`;
+}, after(){ startHeartbeat(); (async()=>{ await loadDThreads(); const el=$('dThreadList'); if(el) el.innerHTML = DTHREADS.length? DTHREADS.map(dThreadRow).join('') : emptyState('chat','No messages yet','Patient conversations will appear here.'); })(); } };
+function dThreadRow(t){ const p=(t.patientName||'P').split(' ').map(x=>x[0]).join('');
+  return `<div class="card tap" style="margin-bottom:10px" onclick="openDThread('${t.id}')"><div class="row">
+    <div class="avatar sm soft" style="position:relative">${p}<span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2px solid var(--surface);background:${t.patientOnline?'var(--green)':'var(--faint)'}"></span></div>
+    <div class="grow"><div class="k" style="font-size:.92rem">${t.patientName}</div><div class="muted" style="font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${t.lastFrom==='doctor'?'You: ':''}${t.last||''}</div></div>
+    ${t.patientOnline?'<span class="pill green" style="align-self:flex-start">Online</span>':''}
+  </div></div>`;
+}
+function openDThread(id){ DCUR=id; go('dthread',id); }
+SCREENS.dthread={ title:'Conversation', body(id){
+  return `<div id="dHead" style="margin-top:4px"></div><div class="chat" id="dBox"><div class="muted">Loading...</div></div>
+  <div class="composer"><input id="dMsg" placeholder="Reply to your patient..." onkeydown="if(event.key==='Enter')sendDMsg()"><button class="send tap" onclick="sendDMsg()">${svg('M22 2 11 13M22 2l-7 20-4-9-9-4z',20)}</button></div>`;
+}, after(id){ DCUR=id; startHeartbeat(); loadDThread(id,true); startDPoll(); } };
+async function loadDThread(id,scroll){
+  try{ const t=await api('/api/doc/threads/'+id);
+    const h=$('dHead'); if(h) h.innerHTML=`<div class="card flat" style="margin-bottom:8px;padding:10px 14px"><div class="row"><div class="avatar sm soft">${(t.patientName||'P').split(' ').map(x=>x[0]).join('')}</div><div class="grow"><div class="k" style="font-size:.9rem">${t.patientName}</div><div class="faint" style="font-size:.74rem">${t.hospitalName||''}</div></div><span class="pill ${t.patientOnline?'green':'grey'}">${t.patientOnline?'Online':'Offline'}</span></div></div>`;
+    dRender(t.messages,scroll);
+  }catch(e){ const b=$('dBox'); if(b) b.innerHTML=`<div class="muted">${e.message}</div>`; }
+}
+function dRender(msgs,scroll){ const b=$('dBox'); if(!b) return; const sig=String(msgs.length)+':'+((msgs[msgs.length-1]||{}).at||0); if(b.dataset.sig===sig) return;
+  b.innerHTML = msgs.map(m=> m.from==='system' ? `<div class="faint" style="text-align:center;font-size:.76rem;margin:8px 4px">${m.text}</div>` : `<div class="bub ${m.from==='doctor'?'me':'them'}">${m.text}<div class="tm">${m.from==='patient'?(m.who+' \u00b7 '):''}${dAgo(m.at)}</div></div>`).join('');
+  b.dataset.sig=sig; if(scroll!==false) b.scrollTop=b.scrollHeight; }
+function dAgo(at){ if(!at)return''; const s=(Date.now()-at)/1000; if(s<60)return'now'; if(s<3600)return Math.floor(s/60)+'m'; if(s<86400)return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d'; }
+function startDPoll(){ stopDPoll(); dpoll=setInterval(()=>{ const cur=state.stack[state.stack.length-1]||{}; if(DCUR && cur.screen==='dthread'){ loadDThread(DCUR,false); } else stopDPoll(); },3500); }
+function stopDPoll(){ if(dpoll){ clearInterval(dpoll); dpoll=null; } }
+async function sendDMsg(){ const el=$('dMsg'); const t=(el.value||'').trim(); if(!t||!DCUR)return; el.value='';
+  try{ const r=await api('/api/doc/threads/'+DCUR+'/message',{method:'POST',body:{text:t}}); dRender(r.messages,true); }catch(e){ toast(e.message); } }
+
+
+SCREENS.home={ body(){
+  const d=DOC.doctor||{}, s=DOC.stats||{}; const upcoming=D.schedule.filter(a=>a.status!=='completed');
+  const first=(d.name||'Dr').split(' ').slice(-1)[0];
+  return `<div class="greeting"><div class="hello">Hello,<br>Dr. ${first}.</div><div class="sub">${d.specialty||''} \u00b7 ${d.facility||''}</div></div>
+  <div class="qa-grid" style="grid-template-columns:repeat(3,1fr);margin-top:18px">
+    <div class="stat"><div class="n">${s.today||0}</div><div class="l">Appointments</div></div>
+    <div class="stat"><div class="n">${s.completed||0}</div><div class="l">Completed</div></div>
+    <div class="stat"><div class="n">${Math.max(0,(s.today||0)-(s.completed||0))}</div><div class="l">Remaining</div></div>
+    <div class="stat"><div class="n" style="${(D.queue&&D.queue.length)?'color:var(--coral)':''}">${(D.queue||[]).length}</div><div class="l">Waiting now</div></div>
+    <div class="stat"><div class="n">${(D.orders||[]).filter(o=>['ordered','in_progress','verified','ready'].includes(o.status)).length}</div><div class="l">Orders in flight</div></div>
+    <div class="stat"><div class="n mono">${ngn(s.earnings||0)}</div><div class="l">Earned</div></div>
+  </div>
+  ${docOrderBar(D.orders||[])}
+  ${(D.notif&&D.notif.unread)?`<div class="card tap" style="margin-top:16px;background:var(--gold-soft)" onclick="openAlerts()"><div class="row between"><div class="k">${D.notif.unread} new update${D.notif.unread>1?'s':''}</div><span class="more">View</span></div></div>`:''}
+  <div class="card" style="margin-top:16px"><div class="row between"><div><div class="k">${(D.shift&&D.shift.open)?('Clocked in '+shiftAgo(D.shift.open.clockIn)):'You are not clocked in'}</div><div class="muted" style="font-size:.82rem">${(D.shift&&D.shift.open)?((D.shift.open.onSite===false?'Off-site':'On-site')+' · shift running'):'Clock in to record your shift'}</div></div>
+    ${(D.shift&&D.shift.open)?`<button class="btn btn-ghost" onclick="docClockOut()">Clock out</button>`:`<button class="btn btn-primary" onclick="docClockIn()">Clock in</button>`}</div></div>
+  <div class="section-h"><h2>Waiting room</h2><span class="more">${(D.queue||[]).length} waiting</span></div>
+  ${(D.queue&&D.queue.length)?D.queue.map(qRow).join(''):emptyState('clock','No one waiting','Patients checked in at the front desk appear here.')}
+  <div class="section-h"><h2>Your orders</h2></div>
+  ${(D.orders&&D.orders.length)?D.orders.slice(0,4).map(docOrderRow).join(''):emptyState('clock','No orders yet','Order a test or write a prescription from a patient page.')}
+  <div class="section-h"><h2>Next patients</h2><span class="more" onclick="switchTab('sched')">Full schedule</span></div>
+  ${upcoming.length?upcoming.slice(0,4).map(apptRow).join(''):emptyState('cal','No upcoming visits','New bookings from patients will appear here.')}
+  <div class="section-h"><h2>Availability</h2></div>
+  <div class="card"><div class="row between"><div><div class="k">Accepting new bookings</div><div class="muted" style="font-size:.82rem">Patients can find and book you</div></div>
+    <div class="toggle ${d.available?'on':''}" id="availToggle" onclick="toggleAvail()"></div></div></div>
+  <div style="height:8px"></div>`;
+}};
+function qRow(e){ const pc=e.priority==='emergency'?'coral':(e.priority==='urgent'?'gold':'teal');
+  const v=e.vitals||{}; const vit=[v.bp?('BP '+v.bp):'',v.temp?('Temp '+v.temp+'°'):'',v.pulse?('HR '+v.pulse):''].filter(Boolean).join(' · ');
+  return `<div class="card" style="margin-bottom:10px"><div class="row"><div class="avatar sm ${e.status==='in_progress'?'gold':'soft'}">${e.token}</div>
+    <div class="grow"><div class="k">${e.patient}</div><div class="muted" style="font-size:.82rem">${e.complaint} · waiting ${e.waitedMin}m</div></div>
+    <span class="pill ${pc}">${e.priority}</span></div>
+    ${vit?`<div class="muted" style="font-size:.82rem;margin-top:8px">${vit}</div>`:''}
+    <div class="row" style="gap:8px;margin-top:10px">${e.status==='waiting'?`<button class="btn btn-primary grow" style="padding:10px" onclick="startConsult('${e.id}')">Start consultation</button>`:`<button class="btn btn-soft grow" style="padding:10px" onclick="go('patient','${e.patientId}')">Open chart</button><button class="btn btn-ghost" style="padding:10px" onclick="doneConsult('${e.id}')">Done</button>`}</div></div>`;
+}
+async function startConsult(id){ try{ await api('/api/doc/queue/'+id+'/start',{method:'POST'}); const e=(D.queue||[]).find(x=>x.id===id); await reload(); render(); toast('Consultation started'); if(e) go('patient',e.patientId); }catch(e){ toast(e.message); } }
+async function doneConsult(id){ try{ await api('/api/doc/queue/'+id+'/done',{method:'POST'}); await reload(); render(); toast('Visit completed'); }catch(e){ toast(e.message); } }
+function shiftAgo(ts){ const m=Math.round((Date.now()-ts)/60000); return m<60?(m+'m ago'):(Math.floor(m/60)+'h '+(m%60)+'m ago'); }
+function docClockIn(){ const go2=(lat,lng,acc)=>api('/api/shift/clockin',{method:'POST',body:{lat,lng,accuracy:acc}}).then(async()=>{ await reload(); render(); toast('Clocked in'); }).catch(e=>toast(e.message));
+  if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(p=>go2(p.coords.latitude,p.coords.longitude,Math.round(p.coords.accuracy)),()=>go2(null,null,null),{timeout:8000}); } else go2(null,null,null); }
+async function docClockOut(){ try{ await api('/api/shift/clockout',{method:'POST'}); await reload(); render(); toast('Clocked out'); }catch(e){ toast(e.message); } }
+function docOrderBar(orders){ if(!orders||!orders.length) return '';
+  const seg=[['Ordered',orders.filter(o=>o.status==='ordered').length,'#E9B23C'],['Active',orders.filter(o=>['in_progress','verified'].includes(o.status)).length,'#3FB2BB'],['Done',orders.filter(o=>['resulted','ready','collected','closed'].includes(o.status)).length,'#15A88A']];
+  const total=seg.reduce((s,x)=>s+x[1],0)||1;
+  return `<div class="card" style="margin-top:4px"><div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Your lab & prescription orders</div><div style="display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--surface-2,#EDF3F3)">${seg.map(s=>`<div style="width:${s[1]/total*100}%;background:${s[2]}" title="${s[0]}"></div>`).join('')}</div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px">${seg.map(s=>`<div style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:${s[2]};display:inline-block"></span>${s[0]} ${s[1]}</div>`).join('')}</div></div>`; }
+function apptRow(a){
+  const vid=a.type==='video'&&a.status!=='completed';
+  const videoBtn=vid?(a.joinable===false?`<button class="btn btn-line" style="padding:8px 12px;opacity:.55" onclick="event.stopPropagation();toast('This visit opens at ${a.scheduledAt?new Date(a.scheduledAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):a.time}.')">Opens ${a.scheduledAt?new Date(a.scheduledAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):a.time}</button>`:`<button class="btn btn-gold" style="padding:8px 12px" onclick="event.stopPropagation();joinDocVisit('${a.id}')">Start video</button>`):'';
+  return `<div class="card tap" style="margin-bottom:10px" onclick="go('patient','${a.patientId}')"><div class="row">
+    <div class="avatar sm ${a.type==='video'?'gold':'soft'}">${svg(a.type==='video'?I.video:I.cal,20)}</div>
+    <div class="grow"><div class="k">${patientName(a.patientId)}</div><div class="muted" style="font-size:.82rem">${a.dept} \u00b7 ${a.date} ${a.time}</div></div>
+    ${videoBtn||(a.status==='completed'?`<span class="pill green">Done</span>`:`<span class="pill ${a.type==='video'?'gold':'teal'}">${a.type==='video'?'Video':'In person'}</span>`)}
+  </div></div>`;
+}
+function patientName(id){ const p=D.patients.find(x=>x.id===id); return p?(p.first+' '+p.last):'Patient'; }
+let DRTC=null, DVISIT=null;
+function joinDocVisit(id){ DVISIT=id; go('docvideo'); }
+SCREENS.docvideo={ title:'Video visit', body(){
+  const a=(D.schedule||[]).find(x=>x.id===DVISIT); const who=a?patientName(a.patientId):'patient';
+  return `<div style="margin-top:12px"></div>
+  <div class="video-stage" style="aspect-ratio:3/4;position:relative;overflow:hidden;border-radius:var(--r-xl,18px);background:linear-gradient(150deg,#0C3237,#15707A);display:flex;align-items:center;justify-content:center">
+    <video id="drRemote" data-keep autoplay playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#04171a"></video>
+    <div id="drStatus" style="position:absolute;top:14px;left:14px;background:rgba(20,112,122,.92);color:#fff;font-size:.68rem;font-weight:800;padding:5px 11px;border-radius:999px">Connecting…</div>
+    <video id="drLocal" data-keep autoplay playsinline muted style="position:absolute;right:12px;bottom:12px;width:84px;height:112px;border-radius:14px;object-fit:cover;border:2px solid rgba(255,255,255,.18);background:#04171a"></video>
+    <div id="drWaiting" class="col" style="align-items:center;color:#fff;position:absolute;inset:0;justify-content:center;pointer-events:none"><div class="avatar lg" style="background:rgba(255,255,255,.14);margin-bottom:10px">${(who||'P')[0]}</div><div style="font-weight:600">${who}</div><div style="color:#8FD0D2;font-size:.84rem">Waiting to connect…</div></div>
+  </div>
+  <div class="vcontrols" style="display:flex;gap:16px;justify-content:center;margin-top:18px">
+    <button class="vbtn" id="drMic" onclick="drMic()" style="width:52px;height:52px;border-radius:50%;border:none;background:var(--surface-2,#EDF3F3)">${svg(I.mic,22)}</button>
+    <button class="vbtn" id="drCam" onclick="drCam()" style="width:52px;height:52px;border-radius:50%;border:none;background:var(--surface-2,#EDF3F3)">${svg(I.video,22)}</button>
+    <button class="vbtn end" onclick="drHang()" style="width:52px;height:52px;border-radius:50%;border:none;background:var(--coral,#DF5039);color:#fff">${svg(I.phone,22)}</button>
+  </div>`;
+}, after(){ startDocRtc(); } };
+async function startDocRtc(){ if(!DVISIT)return; const remote=document.getElementById('drRemote'), local=document.getElementById('drLocal');
+  try{ DRTC=await MediCoreRTC.start({ base:'', token:TOKEN, room:DVISIT, localEl:local, remoteEl:remote,
+    onState:(s)=>{ const el=document.getElementById('drStatus'); if(s==='connected'){ if(el){el.textContent='● Live';el.style.background='rgba(223,80,57,.92)';} const w=document.getElementById('drWaiting'); if(w)w.style.display='none'; } else if(el){ el.textContent=s==='waiting'?'Waiting for patient…':s==='ended'?'Ended':s; } },
+    onError:(e)=>toast(e.message||'Could not start the call') }); }catch(e){ const el=document.getElementById('drStatus'); if(el)el.textContent='Unavailable'; } }
+function drMic(){ if(!DRTC)return; const on=DRTC.toggleMic(); const b=document.getElementById('drMic'); if(b)b.style.opacity=on?'1':'.5'; }
+function drCam(){ if(!DRTC)return; const on=DRTC.toggleCam(); const b=document.getElementById('drCam'); if(b)b.style.opacity=on?'1':'.5'; }
+function drHang(){ if(DRTC){ DRTC.hangup(); DRTC=null; } DVISIT=null; back(); toast('Call ended.'); }
+const OSTATUS={ordered:['gold','Ordered'],verified:['teal','Verified'],in_progress:['teal','In progress'],ready:['green','Ready'],resulted:['green','Resulted'],closed:['green','Complete'],collected:['green','Collected']};
+function docOrderRow(o){ const m=OSTATUS[o.status]||['soft',o.status];
+  return `<div class="card" style="margin-bottom:10px"><div class="row"><div class="avatar sm ${o.type==='lab'?'soft':'gold'}">${svg(I.check,18)}</div>
+    <div class="grow"><div class="k">${o.label||''}</div><div class="muted" style="font-size:.82rem">${o.patient} \u00b7 ${o.type==='lab'?'Lab test':'Prescription'}</div></div>
+    <span class="pill ${m[0]}">${m[1]}</span></div>
+    ${o.result?`<div class="muted" style="font-size:.82rem;margin-top:8px">Result: ${o.result.map(r=>r.test+' '+r.value+(r.unit||'')).join(', ')}</div>`:''}</div>`;
+}
+function docPatientOrders(id){ const list=(D.orders||[]).filter(o=>o.patientId===id); return list.length?list.map(docOrderRow).join(''):''; }
+async function openAlerts(){ let n; try{ n=await api('/api/notifications'); }catch(e){ n={items:[]}; }
+  const items=(n.items||[]).slice(0,20).map(x=>`<div class="lrow"><div class="ic ${x.read?'soft':'teal'}">${svg(I.check,18)}</div><div class="grow"><div class="s">${x.text}</div></div></div>`).join('')||'<div class="lrow"><div class="s muted">No updates yet</div></div>';
+  openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:10px">Updates</div><div class="menu-card">${items}</div>`);
+  try{ await api('/api/notifications/read',{method:'POST',body:{}}); D.notif={items:(n.items||[]),unread:0}; }catch(e){}
+}
+let NEWTYPE='lab';
+function setNewType(t){ NEWTYPE=t; render(); }
+async function submitLab(pid){ const tests=(($('noTests')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean); if(!tests.length){toast('Add at least one test');return;}
+  try{ await api('/api/doc/orders',{method:'POST',body:{type:'lab',patientId:pid,tests}}); await reload(); back(); toast('Lab order sent'); }catch(e){ toast(e.message); } }
+async function submitRx(pid){ const drug=(($('noDrug')||{}).value||'').trim(); const sig=(($('noSig')||{}).value||'').trim(); if(!drug){toast('Enter the medication');return;}
+  try{ await api('/api/doc/orders',{method:'POST',body:{type:'rx',patientId:pid,drug,sig}}); await reload(); back(); toast('Prescription sent to pharmacy'); }catch(e){ toast(e.message); } }
+SCREENS.sched={ body(){
+  if(!D.schedule.length) return emptyState('cal','No appointments yet','Bookings will show here as patients schedule with you.');
+  return `<div style="margin-top:8px"></div>`+D.schedule.map(apptRow).join('');
+}};
+SCREENS.patients={ body(){
+  if(!D.patients.length) return emptyState('people','No patients yet','Patients you see will be listed here.');
+  return `<div style="margin-top:8px"></div><div class="menu-card">`+D.patients.map(p=>`
+    <div class="lrow tap" onclick="go('patient','${p.id}')"><div class="avatar sm soft">${p.first[0]}${p.last[0]}</div>
+    <div class="grow"><div class="t">${p.first} ${p.last}</div><div class="s">${(p.conditions||[]).map(c=>c.name).join(', ')||'No known conditions'}</div></div>${svg(I.chev,20)}</div>`).join('')+`</div>`;
+}};
+SCREENS.patient={ title:'Patient', body(id){
+  const p=D.patients.find(x=>x.id===id)||{first:'Patient',last:''};
+  const appts=D.schedule.filter(a=>a.patientId===id);
+  return `<div style="margin-top:8px"></div>
+  <div class="card"><div class="row"><div class="avatar lg soft">${(p.first||'P')[0]}${(p.last||'')[0]||''}</div>
+    <div class="grow"><div style="font-weight:700;font-size:1.1rem">${p.first} ${p.last}</div><div class="muted" style="font-size:.84rem">${p.hn||''} \u00b7 ${p.plan||''}</div></div></div>
+    ${(p.allergies&&p.allergies.length)?`<div class="pill coral" style="margin-top:12px">Allergy: ${p.allergies.join(', ')}</div>`:''}
+  </div>
+  <div class="section-h"><h2>Visits</h2></div>
+  <div class="menu-card">${appts.length?appts.map(a=>`<div class="lrow"><div class="ic ${a.status==='completed'?'green':'teal'}">${svg(a.status==='completed'?I.check:I.clock,20)}</div><div class="grow"><div class="t">${a.dept}</div><div class="s">${a.date} ${a.time} \u00b7 ${a.type}</div></div>${a.status!=='completed'?`<button class="btn btn-soft" style="padding:8px 12px" onclick="complete('${a.id}')">Complete</button>`:''}</div>`).join(''):'<div class="lrow"><div class="s muted">No visits yet</div></div>'}</div>
+  <div class="section-h"><h2>Orders</h2></div>
+  <button class="btn btn-soft btn-block tap" style="margin-bottom:10px" onclick="go('neworder','${id}')">Order lab test or prescription</button>
+  ${docPatientOrders(id)}
+  <div class="section-h"><h2>Messages</h2></div>
+  <div id="thread"><div class="muted" style="font-size:.85rem">Loading...</div></div>
+  <div class="composer"><input id="docMsg" placeholder="Reply to ${p.first}..." onkeydown="if(event.key==='Enter')sendReply('${id}')"><button class="send tap" onclick="sendReply('${id}')">${svg('M22 2 11 13M22 2l-7 20-4-9-9-4z',20)}</button></div>`;
+}, after(id){ loadThread(id); } };
+SCREENS.neworder={ title:'New order', body(pid){ const p=D.patients.find(x=>x.id===pid)||{first:'Patient',last:''};
+  return `<div style="margin-top:8px"></div>
+  <div class="card"><div class="k">${p.first} ${p.last}</div><div class="muted" style="font-size:.84rem">${p.hn||''} \u00b7 ${p.plan||''}</div></div>
+  <div class="row" style="gap:8px;margin:14px 0">
+    <button class="btn ${NEWTYPE==='lab'?'btn-primary':'btn-soft'} tap" style="flex:1" onclick="setNewType('lab')">Lab test</button>
+    <button class="btn ${NEWTYPE==='rx'?'btn-primary':'btn-soft'} tap" style="flex:1" onclick="setNewType('rx')">Prescription</button>
+  </div>
+  ${NEWTYPE==='lab'
+    ? `<div class="field"><label>Tests (comma separated)</label><input id="noTests" placeholder="e.g. Lipid profile, HbA1c"></div>
+       <button class="btn btn-primary btn-block btn-lg tap" onclick="submitLab('${pid}')">Send to lab</button>`
+    : `<div class="field"><label>Medication</label><input id="noDrug" placeholder="e.g. Amlodipine 5mg"></div>
+       <div class="field"><label>Instructions</label><input id="noSig" placeholder="e.g. 1 tablet each morning"></div>
+       <button class="btn btn-primary btn-block btn-lg tap" onclick="submitRx('${pid}')">Send to pharmacy</button>`}`;
+}};
+async function loadThread(id){
+  try{ const msgs=await api('/api/doc/thread/'+id); $('thread').innerHTML=`<div class="chat">`+(msgs.length?msgs.map(m=>`<div class="bub ${m.from==='them'?'me':'them'}">${m.text}<div class="tm">${m.who||'Patient'}</div></div>`).join(''):'<div class="muted" style="font-size:.85rem">No messages yet</div>')+`</div>`; }
+  catch(e){ $('thread').innerHTML=`<div class="muted">${e.message}</div>`; }
+}
+async function sendReply(id){ const el=$('docMsg'); const t=(el.value||'').trim(); if(!t)return; el.value='';
+  try{ await api('/api/doc/reply',{method:'POST',body:{patientId:id,text:t}}); loadThread(id); toast('Reply sent'); }catch(e){ toast(e.message); } }
+async function complete(id){ try{ await api('/api/doc/appointments/'+id+'/complete',{method:'POST',body:{}}); await reload(); render(); toast('Visit completed and saved to the record'); }catch(e){ toast(e.message); } }
+async function toggleAvail(){ const d=DOC.doctor; try{ const r=await api('/api/doc/availability',{method:'POST',body:{available:!d.available}}); d.available=r.available; render(); toast(r.available?'You are now accepting bookings':'You are now unavailable'); }catch(e){ toast(e.message); } }
+SCREENS.me={ body(){
+  const d=DOC.doctor||{}, s=DOC.stats||{};
+  return `<div style="margin-top:8px"></div>
+  <div class="card"><div class="row"><div class="avatar lg gold">${(d.name||'Dr').split(' ').slice(-1)[0][0]}</div><div class="grow"><div style="font-weight:700;font-size:1.15rem">${d.name}</div><div class="muted" style="font-size:.84rem">${d.specialty}</div>
+    <div class="row" style="gap:5px;margin-top:6px"><span class="pill gold">${svg(I.star,13)} ${d.rating}</span><span class="pill grey">${d.reviews} reviews</span></div></div></div></div>
+  <div class="section-h"><h2>This period</h2></div>
+  <div class="qa-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat"><div class="n">${s.today||0}</div><div class="l">Booked</div></div>
+    <div class="stat"><div class="n">${s.completed||0}</div><div class="l">Seen</div></div>
+    <div class="stat"><div class="n mono">${ngn(s.earnings||0)}</div><div class="l">Earnings</div></div>
+  </div>
+  <div class="section-h"><h2>Consultation fees</h2></div>
+  <div class="menu-card">
+    <div class="lrow"><div class="ic">${svg(I.home,20)}</div><div class="grow"><div class="t">In-person visit</div></div><span class="k mono">${ngn((DOC.fees&&DOC.fees.feeInPerson)||d.fee)}</span></div>
+    <div class="lrow"><div class="ic">${svg(I.video,20)}</div><div class="grow"><div class="t">Video visit</div></div><span class="k mono">${ngn((DOC.fees&&DOC.fees.feeVideo)!=null?(DOC.fees.feeVideo):d.fee)}</span></div>
+  </div>
+  <button class="btn btn-line btn-block tap" style="margin-top:8px" onclick="editFees()">Edit my fees</button>
+  <div class="section-h"><h2>Practice</h2></div>
+  <div class="menu-card">
+    <div class="lrow"><div class="ic">${svg(I.people,20)}</div><div class="grow"><div class="t">Languages</div></div><span class="muted" style="font-size:.85rem">${(d.languages||[]).join(', ')}</span></div>
+    <div class="lrow"><div class="ic">${svg(I.home,20)}</div><div class="grow"><div class="t">Facility</div></div><span class="muted" style="font-size:.85rem">${d.facility}</span></div>
+  </div>
+  <button class="btn btn-block tap" style="margin-top:16px;justify-content:flex-start;gap:10px;background:var(--coral-soft);color:var(--coral)" onclick="logout()">${svg(I.logout,20)} Log out</button>
+  <div style="height:8px"></div>`;
+}};
+function editFees(){ const f=DOC.fees||{feeInPerson:(DOC.doctor||{}).fee,feeVideo:(DOC.doctor||{}).fee};
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Set your consultation fees</div>
+  <div class="muted" style="font-size:.85rem;margin-bottom:14px">Patients see these when booking. You can price video and in-person differently.</div>
+  <div class="field"><label>In-person visit (₦)</label><input id="feeIn" type="number" inputmode="numeric" value="${f.feeInPerson}"></div>
+  <div class="field"><label>Video visit (₦)</label><input id="feeVid" type="number" inputmode="numeric" value="${f.feeVideo}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" style="margin-top:8px" onclick="saveFees()">Save fees</button>`); }
+async function saveFees(){ const feeInPerson=Number(document.getElementById('feeIn').value), feeVideo=Number(document.getElementById('feeVid').value);
+  try{ const r=await api('/api/doc/fees',{method:'POST',body:{feeInPerson,feeVideo}}); DOC.fees=r.fees; if(DOC.doctor)DOC.doctor.fee=r.fees.feeInPerson; closeSheet(); render(); toast('Fees updated. Patients will see the new prices.'); }catch(e){ toast(e.message); } }
+function emptyState(ic,t,s){ return `<div class="empty"><div class="ic">${svg(I[ic]||I.home,28)}</div><div class="t">${t}</div><div style="font-size:.88rem">${s}</div></div>`; }
+function openSheet(h){ $('sheet').innerHTML=h; $('sheet').classList.add('on'); $('scrim').classList.add('on'); }
+function closeSheet(){ $('sheet').classList.remove('on'); $('scrim').classList.remove('on'); }
+function toast(m){ const w=$('toastWrap'); const t=document.createElement('div'); t.className='toast'; t.innerHTML=`<span class="ic">${svg(I.check,17)}</span>${m}`; w.appendChild(t); setTimeout(()=>{t.style.transition='opacity .3s, transform .3s';t.style.opacity='0';t.style.transform='translateY(10px)';setTimeout(()=>t.remove(),300);},2400); }
+let theme='light';
+function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',theme); try{localStorage.setItem('mcd-theme',theme);}catch(e){} render(); }
+(function(){ try{ const s=localStorage.getItem('mcd-theme'); if(s)theme=s; else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)theme='dark'; }catch(e){} document.documentElement.setAttribute('data-theme',theme);
+  if(TOKEN){ (async()=>{ try{ const me=await api('/api/doc/me'); if(me.doctor){ DOC=me; await enterApp(); } }catch(e){ TOKEN=null; try{localStorage.removeItem('mcd:token');}catch(e){} } })(); }
+})();
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
+</body>
+</html>

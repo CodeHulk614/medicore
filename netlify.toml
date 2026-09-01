@@ -1,0 +1,41 @@
+# MediCore — ALL-ON-NETLIFY edition.
+# The 11 apps (public/) are static; the whole API runs as one Netlify Function
+# backed by Netlify Blobs (free). No separate backend host needed.
+
+[build]
+  publish = "public"
+  command = ""
+
+[functions]
+  node_bundler = "esbuild"
+  # bundle these into the function
+  external_node_modules = ["express", "bcryptjs", "jsonwebtoken", "cors", "serverless-http", "@netlify/blobs"]
+
+# every /api call goes to the function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
+[[headers]]
+  for = "/*.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"

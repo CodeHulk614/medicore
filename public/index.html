@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0C3237">
+<title>MediCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF2F2; --surface:#FFFFFF; --surface-2:#F4F8F8;
+  --ink:#0C2A2E; --muted:#5E7678; --faint:#93A9AA; --line:#E4EBEB;
+  --teal:#15707A; --teal-ink:#0C3237; --teal-soft:#E2F0F0;
+  --gold:#E9B23C; --gold-deep:#B7841F; --gold-soft:#FBEFD3;
+  --green:#2E9E7B; --green-soft:#E0F1EA;
+  --coral:#DF5039; --coral-soft:#FBE5E0;
+  --shadow-1:0 1px 2px rgba(12,42,46,.05), 0 2px 8px rgba(12,42,46,.05);
+  --shadow-2:0 4px 16px rgba(12,42,46,.10);
+  --shadow-card:0 10px 30px rgba(12,50,55,.14);
+  --fd:'Spectral',Georgia,serif; --fb:'Inter',-apple-system,system-ui,sans-serif;
+  --r:14px; --r-lg:18px; --r-xl:22px;
+}
+html[data-theme="dark"]{
+  --bg:#081416; --surface:#0F2429; --surface-2:#13292E;
+  --ink:#EAF3F2; --muted:#93AEB0; --faint:#5E7B7D; --line:rgba(255,255,255,.08);
+  --teal:#3FB2BB; --teal-ink:#0B2024; --teal-soft:rgba(63,178,187,.14);
+  --gold:#E9B23C; --gold-deep:#E9B23C; --gold-soft:rgba(233,178,60,.14);
+  --green:#3FC79A; --green-soft:rgba(63,199,154,.14);
+  --coral:#F0785F; --coral-soft:rgba(240,120,95,.14);
+  --shadow-1:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 4px 16px rgba(0,0,0,.4);
+  --shadow-card:0 12px 34px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; height:100%}
+body{
+  font-family:var(--fb); background:var(--bg); color:var(--ink);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+  font-size:16px; line-height:1.5;
+}
+button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit}
+input{font-family:inherit}
+.mono{font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+@media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+
+/* ---------- app frame ---------- */
+#app{max-width:520px; margin:0 auto; min-height:100%; position:relative}
+.screen-wrap{ padding:0 18px calc(96px + env(safe-area-inset-bottom)); }
+.topbar{
+  position:sticky; top:0; z-index:40; background:var(--bg);
+  padding-top:calc(env(safe-area-inset-top) + 8px);
+  display:flex; align-items:center; gap:12px; min-height:52px;
+}
+.topbar.detail{ padding-bottom:6px; border-bottom:1px solid transparent }
+.tb-back{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--surface); box-shadow:var(--shadow-1) }
+.tb-title{ font-weight:700; font-size:1.08rem; flex:1 }
+.tb-actions{ display:flex; gap:8px; margin-left:auto }
+.tb-btn{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--surface); box-shadow:var(--shadow-1); position:relative }
+.tb-btn .dot{ position:absolute; top:9px; right:9px; width:8px; height:8px; border-radius:50%; background:var(--coral); border:2px solid var(--surface) }
+
+.avatar{ border-radius:50%; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex:none; overflow:hidden }
+.avatar.lg{ width:56px; height:56px; font-size:1.3rem }
+.avatar.sm{ width:38px; height:38px; font-size:.9rem }
+.avatar.gold{ background:var(--gold); color:#3a2b06 }
+.avatar.soft{ background:var(--teal-soft); color:var(--teal) }
+
+/* large greeting title */
+.greeting{ margin:6px 0 2px }
+.greeting .hello{ font-family:var(--fd); font-weight:600; font-size:1.95rem; line-height:1.05; letter-spacing:-.01em }
+.greeting .sub{ color:var(--muted); font-size:.92rem; margin-top:4px }
+
+.eyebrow{ font-size:.68rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--teal) }
+.eyebrow.gold{ color:var(--gold-deep) } .eyebrow.muted{ color:var(--faint) }
+
+.section-h{ display:flex; align-items:baseline; justify-content:space-between; margin:24px 2px 12px }
+.section-h h2{ font-size:1.06rem; font-weight:700; margin:0 }
+.section-h .more{ color:var(--teal); font-size:.84rem; font-weight:600 }
+
+/* ---------- cards ---------- */
+.card{ background:var(--surface); border-radius:var(--r-lg); padding:16px; box-shadow:var(--shadow-1) }
+.card.flat{ box-shadow:none; border:1px solid var(--line) }
+.tap{ transition:transform .12s ease }
+.tap:active{ transform:scale(.975) }
+
+.row{ display:flex; align-items:center; gap:12px }
+.between{ justify-content:space-between }
+.col{ display:flex; flex-direction:column }
+.grow{ flex:1; min-width:0 }
+.ellip{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.muted{ color:var(--muted) } .faint{ color:var(--faint) }
+.k{ font-weight:600 }
+
+/* status strip (home) */
+.strip{ display:flex; gap:10px; margin-top:16px }
+.strip .chip{ flex:1; background:var(--surface); border-radius:var(--r); padding:12px 12px; box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:2px }
+.strip .chip .lab{ font-size:.68rem; color:var(--faint); font-weight:700; text-transform:uppercase; letter-spacing:.05em }
+.strip .chip .val{ font-weight:700; font-size:.98rem }
+.strip .chip .val.ok{ color:var(--green) }
+
+/* quick actions */
+.qa-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px }
+.qa{ background:var(--surface); border-radius:var(--r); padding:12px 6px; display:flex; flex-direction:column; align-items:center; gap:7px; box-shadow:var(--shadow-1) }
+.qa .ic{ width:44px; height:44px; border-radius:13px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center }
+.qa .lab{ font-size:.72rem; font-weight:600; color:var(--ink); text-align:center; line-height:1.1 }
+
+/* list rows */
+.lrow{ display:flex; align-items:center; gap:13px; padding:13px 0; border-bottom:1px solid var(--line) }
+.lrow:last-child{ border-bottom:none }
+.lrow .ic{ width:42px; height:42px; border-radius:12px; background:var(--teal-soft); color:var(--teal); display:flex; align-items:center; justify-content:center; flex:none }
+.lrow .ic.gold{ background:var(--gold-soft); color:var(--gold-deep) }
+.lrow .ic.coral{ background:var(--coral-soft); color:var(--coral) }
+.lrow .ic.green{ background:var(--green-soft); color:var(--green) }
+.lrow .t{ font-weight:600; font-size:.94rem }
+.lrow .s{ color:var(--muted); font-size:.8rem; margin-top:1px }
+.lrow .chev{ color:var(--faint); margin-left:auto; flex:none }
+
+/* menu card (care hub) */
+.menu-card{ background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--shadow-1); padding:4px 16px }
+
+/* pills */
+.pill{ display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:.72rem; font-weight:700 }
+.pill .d{ width:6px; height:6px; border-radius:50%; background:currentColor }
+.pill.green{ background:var(--green-soft); color:var(--green) }
+.pill.gold{ background:var(--gold-soft); color:var(--gold-deep) }
+.pill.coral{ background:var(--coral-soft); color:var(--coral) }
+.pill.teal{ background:var(--teal-soft); color:var(--teal) }
+.pill.grey{ background:var(--surface-2); color:var(--muted) }
+
+/* buttons */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:.94rem; padding:13px 18px; border-radius:var(--r); transition:transform .12s ease, filter .15s }
+.btn:active{ transform:scale(.97) }
+.btn-primary{ background:var(--teal); color:#fff }
+.btn-gold{ background:var(--gold); color:#3a2b06 }
+.btn-soft{ background:var(--teal-soft); color:var(--teal) }
+.btn-ghost{ background:var(--surface-2); color:var(--ink) }
+.btn-line{ background:transparent; border:1.5px solid var(--line); color:var(--ink) }
+.btn-block{ width:100%; padding:15px }
+.btn-lg{ padding:16px 20px; font-size:1rem }
+
+/* health tip */
+.tip{ background:linear-gradient(135deg,#0C3237,#15707A); color:#fff; border-radius:var(--r-lg); padding:18px; position:relative; overflow:hidden }
+.tip .eyebrow{ color:#8FD0D2 }
+.tip h3{ font-family:var(--fd); font-weight:600; font-size:1.15rem; margin:8px 0 4px; line-height:1.15 }
+.tip p{ color:#BFE0E1; font-size:.86rem; margin:0 }
+.tip .orb{ position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:rgba(233,178,60,.18) }
+
+/* ---------- digital ID card (signature) ---------- */
+.idwrap{ perspective:1400px }
+.idcard{ position:relative; width:100%; aspect-ratio:1.586/1; transform-style:preserve-3d; transition:transform .6s cubic-bezier(.3,.7,.3,1); cursor:pointer }
+.idcard.flip{ transform:rotateY(180deg) }
+.idface{ position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--r-xl); overflow:hidden; box-shadow:var(--shadow-card) }
+.idfront{ background:radial-gradient(120% 140% at 0% 0%, #1c7d86 0%, #0C3237 60%, #081f23 100%); color:#fff; padding:18px 20px; display:flex; flex-direction:column }
+.idfront .guilloche{ position:absolute; inset:0; opacity:.5;
+  background-image:repeating-radial-gradient(circle at 80% 20%, rgba(233,178,60,.10) 0 1px, transparent 1px 10px), repeating-linear-gradient(60deg, rgba(255,255,255,.04) 0 1px, transparent 1px 9px); }
+.idfront .top{ display:flex; align-items:center; justify-content:space-between; position:relative; z-index:1 }
+.idfront .brand{ display:flex; align-items:center; gap:8px; font-weight:600; font-family:var(--fd); font-size:1rem }
+.idfront .plan{ font-size:.64rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); background:rgba(233,178,60,.14); padding:4px 9px; border-radius:999px }
+.idfront .who{ position:relative; z-index:1; margin-top:auto }
+.idfront .who .nm{ font-size:1.15rem; font-weight:700; letter-spacing:.01em }
+.idfront .who .no{ font-family:var(--fb); font-variant-numeric:tabular-nums; letter-spacing:.14em; font-size:.82rem; color:#9FC6C8; margin-top:2px }
+.idfront .foot{ position:relative; z-index:1; display:flex; align-items:flex-end; justify-content:space-between; margin-top:12px }
+.idfront .foot .meta{ font-size:.66rem; color:#8FB4B6; line-height:1.5 }
+.idfront .foot .meta b{ color:#DDEDEE; font-weight:600 }
+.qr{ width:62px; height:62px; background:#fff; border-radius:9px; padding:5px }
+.idback{ background:linear-gradient(160deg,#123f45,#0a2a2e); color:#fff; transform:rotateY(180deg); padding:16px 18px; display:flex; flex-direction:column }
+.idback .magstripe{ position:absolute; left:0; right:0; top:16px; height:34px; background:#06181b }
+.idback .bcontent{ margin-top:52px; position:relative; z-index:1 }
+.idback .balrow{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px }
+.idback .balrow .l{ font-size:.78rem; color:#9FC6C8 }
+.idback .balrow .v{ font-weight:700; font-variant-numeric:tabular-nums }
+.flip-hint{ text-align:center; font-size:.74rem; color:var(--faint); margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px }
+
+/* benefit meters */
+.meter{ margin-bottom:16px }
+.meter .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:7px }
+.meter .name{ font-weight:600; font-size:.9rem }
+.meter .amt{ font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums }
+.track{ height:8px; background:var(--surface-2); border-radius:999px; overflow:hidden }
+.track > div{ height:100%; border-radius:999px; background:var(--teal); transition:width .6s ease }
+.track > div.warn{ background:var(--gold) } .track > div.low{ background:var(--coral) }
+
+/* provider search */
+.searchbar{ display:flex; align-items:center; gap:10px; background:var(--surface); border-radius:var(--r); padding:12px 14px; box-shadow:var(--shadow-1); margin-bottom:14px }
+.searchbar input{ border:none; outline:none; background:transparent; flex:1; font-size:.95rem; color:var(--ink) }
+.searchbar input::placeholder{ color:var(--faint) }
+
+/* record tabs (segmented) */
+.seg{ display:flex; background:var(--surface-2); border-radius:12px; padding:3px; gap:2px; margin:14px 0 4px }
+.seg button{ flex:1; padding:9px 4px; border-radius:9px; font-weight:600; font-size:.82rem; color:var(--muted) }
+.seg button.on{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow-1) }
+
+/* result row with range */
+.range-mini{ height:6px; background:linear-gradient(90deg,var(--coral-soft),var(--green-soft) 30%,var(--green-soft) 70%,var(--coral-soft)); border-radius:999px; position:relative; margin-top:8px }
+.range-mini i{ position:absolute; top:-3px; width:3px; height:12px; background:var(--ink); border-radius:2px; transform:translateX(-50%) }
+.range-mini i.crit{ background:var(--coral) }
+
+/* chat */
+.chat{ display:flex; flex-direction:column; gap:9px; padding:6px 0 4px }
+.bub{ max-width:80%; padding:11px 14px; border-radius:16px; font-size:.9rem; line-height:1.45 }
+.bub.them{ background:var(--surface); align-self:flex-start; border-bottom-left-radius:5px; box-shadow:var(--shadow-1) }
+.bub.me{ background:var(--teal); color:#fff; align-self:flex-end; border-bottom-right-radius:5px }
+.bub .tm{ font-size:.64rem; opacity:.7; margin-top:3px }
+.composer{ position:sticky; bottom:calc(96px + env(safe-area-inset-bottom)); display:flex; gap:8px; padding:8px 0 }
+.composer input{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:12px 16px; outline:none; color:var(--ink); font-size:.92rem }
+.composer .send{ width:46px; height:46px; border-radius:50%; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; flex:none }
+
+/* delivery timeline */
+.tl{ display:flex; flex-direction:column; gap:0; margin-top:6px }
+.tl .step{ display:flex; gap:14px; }
+.tl .rail{ display:flex; flex-direction:column; align-items:center }
+.tl .dot{ width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; background:var(--surface-2); color:var(--faint); flex:none; z-index:1 }
+.tl .dot.done{ background:var(--teal); color:#fff }
+.tl .dot.now{ background:var(--gold); color:#3a2b06; box-shadow:0 0 0 5px var(--gold-soft) }
+.tl .line{ width:2px; flex:1; background:var(--line) }
+.tl .line.done{ background:var(--teal) }
+.tl .step .body{ padding-bottom:22px }
+.tl .step:last-child .body{ padding-bottom:0 }
+.tl .step .body .t{ font-weight:600; font-size:.92rem }
+.tl .step .body .s{ color:var(--muted); font-size:.78rem }
+
+/* video screen */
+.video-stage{ background:linear-gradient(150deg,#0C3237,#15707A); border-radius:var(--r-xl); aspect-ratio:3/4; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden }
+.video-stage .self{ position:absolute; right:12px; bottom:12px; width:84px; height:112px; border-radius:14px; background:#04171a; border:2px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; color:#6f9799; font-size:.72rem }
+.video-stage .live{ position:absolute; top:14px; left:14px; background:rgba(223,80,57,.92); color:#fff; font-size:.68rem; font-weight:800; padding:5px 11px; border-radius:999px; letter-spacing:.04em }
+.vcontrols{ display:flex; gap:14px; justify-content:center; margin-top:16px }
+.vbtn{ width:56px; height:56px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-1); display:flex; align-items:center; justify-content:center }
+.vbtn.end{ background:var(--coral); color:#fff }
+
+/* empty state */
+.empty{ text-align:center; padding:52px 20px; color:var(--muted) }
+.empty .ic{ width:64px; height:64px; border-radius:20px; background:var(--surface); box-shadow:var(--shadow-1); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; color:var(--teal) }
+.empty .t{ font-weight:700; color:var(--ink); margin-bottom:4px }
+
+/* skeleton */
+.sk{ background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%); background-size:400% 100%; animation:sh 1.3s ease infinite; border-radius:10px }
+@keyframes sh{ 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+
+/* ---------- bottom island tab bar ---------- */
+.tabbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  display:flex; justify-content:center; pointer-events:none;
+  padding:0 14px calc(10px + env(safe-area-inset-bottom));
+}
+.tabbar-inner{
+  pointer-events:auto; width:100%; max-width:492px;
+  background:var(--surface); border-radius:var(--r-xl);
+  box-shadow:var(--shadow-2), 0 0 0 1px var(--line);
+  display:flex; padding:8px 8px; gap:2px;
+  backdrop-filter:saturate(1.4);
+}
+.tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 2px; border-radius:14px; color:var(--faint); transition:color .18s, background .18s }
+.tab .lab{ font-size:.64rem; font-weight:700; letter-spacing:.01em }
+.tab.on{ color:var(--teal); background:var(--teal-soft) }
+.tab:active{ transform:scale(.94) }
+
+/* ---------- bottom sheet ---------- */
+.scrim{ position:fixed; inset:0; background:rgba(6,20,22,.5); z-index:60; opacity:0; pointer-events:none; transition:opacity .25s }
+.scrim.on{ opacity:1; pointer-events:auto }
+.sheet{ position:fixed; left:0; right:0; bottom:0; z-index:61; background:var(--surface); border-radius:22px 22px 0 0; padding:8px 20px calc(24px + env(safe-area-inset-bottom)); box-shadow:0 -10px 40px rgba(0,0,0,.2); transform:translateY(110%); transition:transform .3s cubic-bezier(.3,.8,.3,1); max-width:520px; margin:0 auto }
+.sheet.on{ transform:translateY(0) }
+.sheet .grab{ width:40px; height:4px; border-radius:999px; background:var(--line); margin:8px auto 14px }
+.sheet h3{ font-size:1.15rem; margin:0 0 4px }
+.field{ margin:14px 0 }
+.field label{ display:block; font-size:.78rem; font-weight:700; color:var(--muted); margin-bottom:6px }
+.field .inp, .field select{ width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:13px 14px; font-size:.95rem; color:var(--ink); outline:none }
+.opt-row{ display:flex; gap:8px; flex-wrap:wrap }
+.opt{ padding:11px 14px; border-radius:12px; background:var(--surface-2); font-weight:600; font-size:.88rem; border:1.5px solid transparent }
+.opt.on{ border-color:var(--teal); background:var(--teal-soft); color:var(--teal) }
+
+/* toast */
+.toast-wrap{ position:fixed; left:0; right:0; bottom:calc(104px + env(safe-area-inset-bottom)); z-index:80; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; padding:0 18px }
+.toast{ background:var(--teal-ink); color:#fff; padding:12px 16px; border-radius:14px; font-size:.86rem; font-weight:500; box-shadow:var(--shadow-2); display:flex; align-items:center; gap:9px; max-width:100%; animation:tin .3s ease }
+.toast .ic{ color:var(--gold) }
+@keyframes tin{ from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:translateY(0)} }
+
+/* ---------- lock screen ---------- */
+#lock{ position:fixed; inset:0; z-index:100; background:radial-gradient(120% 100% at 50% 0%, #15707A 0%, #0C3237 55%, #071e21 100%); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; transition:opacity .4s, transform .4s }
+#lock.hide{ opacity:0; transform:scale(1.04); pointer-events:none }
+#lock .mark{ width:66px; height:66px; border-radius:20px; border:2px solid var(--gold); display:flex; align-items:center; justify-content:center; margin-bottom:18px }
+#lock .nm{ font-family:var(--fd); font-weight:600; font-size:1.7rem }
+#lock .tag{ color:#8FD0D2; font-size:.82rem; margin-top:4px; margin-bottom:44px }
+#lock .bio{ width:76px; height:76px; border-radius:50%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; color:var(--gold); transition:transform .15s }
+#lock .bio:active{ transform:scale(.92) }
+#lock .hint{ color:#9FC6C8; font-size:.86rem; margin-top:16px }
+.lock-title{ font-size:1.02rem; color:#DDEDEE; font-weight:500; text-align:center; min-height:24px }
+.pin-dots{ display:flex; gap:16px; margin:22px 0 30px }
+.pin-dots .pd{ width:13px; height:13px; border-radius:50%; border:2px solid rgba(255,255,255,.38); transition:.15s }
+.pin-dots .pd.on{ background:var(--gold); border-color:var(--gold); transform:scale(1.1) }
+#lock.shake{ animation:shk .42s }
+@keyframes shk{ 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-9px)} 40%,80%{transform:translateX(9px)} }
+.keypad{ display:grid; grid-template-columns:repeat(3,70px); gap:18px; justify-content:center }
+.keypad button{ width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); color:#fff; font-size:1.5rem; font-weight:500; display:flex; align-items:center; justify-content:center; transition:transform .1s, background .15s }
+.keypad button:active{ transform:scale(.9); background:rgba(255,255,255,.2) }
+.keypad button.blank{ background:none; border:none; pointer-events:none }
+.lock-reset{ color:#8FD0D2; font-size:.82rem; margin-top:26px; text-decoration:underline; background:none }
+.authinp{ width:100%; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); border-radius:12px; padding:14px 16px; color:#fff; font-size:.95rem; margin-bottom:10px; outline:none }
+.authinp::placeholder{ color:#8FB4B6 }
+.autherr{ color:#F0967f; font-size:.82rem; min-height:18px; margin:2px 0 6px }
+.authswitch{ text-align:center; margin-top:18px; color:#9FC6C8; font-size:.86rem }
+.authswitch button{ color:var(--gold); font-weight:600; background:none; text-decoration:underline }
+
+.screen{ animation:pop .28s ease }
+@keyframes pop{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+:focus-visible{ outline:2px solid var(--teal); outline-offset:2px }
+</style>
+<link rel="manifest" href="/index.webmanifest">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+</head>
+<body>
+
+<div id="lock">
+  <div class="mark">
+    <svg width="34" height="34" viewBox="0 0 48 48"><path d="M8 26 h8 l4 -11 l6 22 l4 -14 l3 3 h7" fill="none" stroke="#E9B23C" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="nm">MediCore</div>
+  <div class="tag" style="margin-bottom:22px">Your care and cover, in one place</div>
+  <div id="authForm" style="width:100%;max-width:340px">
+    <div class="lock-title" id="authTitle" style="margin-bottom:16px">Sign in to your account</div>
+    <input id="authEmail" class="authinp" placeholder="Email" autocapitalize="off" autocorrect="off" value="amaka@demo.ng">
+    <input id="authPass" class="authinp" type="password" placeholder="Password" value="demo1234">
+    <div id="authName" style="display:none">
+      <input id="authFirst" class="authinp" placeholder="First name">
+      <input id="authLast" class="authinp" placeholder="Last name">
+    </div>
+    <div id="authErr" class="autherr"></div>
+    <button class="btn btn-gold btn-block btn-lg tap" id="authBtn" style="margin-top:6px" onclick="submitAuth()">Sign in</button>
+    <div class="authswitch" style="text-align:center;color:var(--muted);font-size:.82rem;margin-top:12px">
+      New to MediCore? Your hospital's front desk registers you and gives you your login.
+    </div>
+  </div>
+</div>
+
+<div id="app" style="visibility:hidden">
+  <div id="header"></div>
+  <div class="screen-wrap"><div id="view"></div></div>
+</div>
+
+<div class="tabbar" id="tabbar" style="display:none">
+  <div class="tabbar-inner" id="tabbarInner"></div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script src="/mapkit.js"></script>
+<script src="/rtc.js"></script>
+<script src="/refresh.js"></script>
+<script>
+'use strict';
+
+/* ============ icons ============ */
+const I = {
+  home:'M3 10.5 12 3l9 7.5M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5',
+  care:'M12 21s-7-4.6-9.3-9C1 8.6 2.7 5 6.2 5 8.5 5 10 6.6 12 9c2-2.4 3.5-4 5.8-4C21.3 5 23 8.6 21.3 12 19 16.4 12 21 12 21z',
+  cover:'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M6.5 15h4',
+  records:'M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM14 3v5h5M9 13h6M9 17h4',
+  chat:'M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z',
+  calendar:'M8 3v3M16 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
+  video:'M15 10.5 21 7v10l-6-3.5M3 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  pill:'M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7zM8.5 8.5l7 7',
+  truck:'M3 6h11v9H3zM14 9h4l3 3v3h-7M6.5 18.5a1.8 1.8 0 1 0 0 .1M17.5 18.5a1.8 1.8 0 1 0 0 .1',
+  hospital:'M4 21V9l8-5 8 5v12M9 21v-5h6v5M12 8v3M10.5 9.5h3',
+  bill:'M6 2h9l4 4v16l-3-2-3 2-3-2-3 2V6a4 4 0 0 1 2-4zM9 8h6M9 12h6',
+  shield:'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z',
+  file:'M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM14 3v5h5',
+  flask:'M9 3h6M10 3v6l-4 8a2 2 0 0 0 2 3h8a2 2 0 0 0 2-3l-4-8V3',
+  chev:'M9 6l6 6-6 6',
+  plus:'M12 5v14M5 12h14', x:'M6 6l12 12M18 6 6 18', check:'M20 6 9 17l-5-5',
+  bell:'M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  mic:'M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM19 11a7 7 0 0 1-14 0M12 18v3',
+  cam:'M15 10.5 21 7v10l-6-3.5M3 7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  phone:'M4 4h4l2 5-3 2a12 12 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 6a2 2 0 0 1 2-2z',
+  pin:'M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10zM12 9a2 2 0 1 0 0 .1',
+  moon:'M21 12.8A8 8 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z',
+  gear:'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a7.9 7.9 0 0 0 .1-3l1.5-1.2-1.5-2.6-1.9.6a8 8 0 0 0-2.6-1.5L14 3h-3l-.5 1.9a8 8 0 0 0-2.6 1.5l-1.9-.6L3.5 8.4 5 9.6a7.9 7.9 0 0 0 0 3l-1.5 1.2 1.5 2.6 1.9-.6a8 8 0 0 0 2.6 1.5L11 21h3l.5-1.9a8 8 0 0 0 2.6-1.5l1.9.6 1.5-2.6z',
+  logout:'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  heart:'M12 21s-7-4.6-9.3-9C1 8.6 2.7 5 6.2 5 8.5 5 10 6.6 12 9c2-2.4 3.5-4 5.8-4C21.3 5 23 8.6 21.3 12 19 16.4 12 21 12 21z',
+  refresh:'M21 12a9 9 0 1 1-3-6.7L21 8M21 4v4h-4',
+};
+const svg = (p,w) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="${w||22}" height="${w||22}" stroke-linecap="round" stroke-linejoin="round">${p.split('M').filter(Boolean).map(s=>`<path d="M${s}"/>`).join('')}</svg>`;
+const ngn = n => '\u20a6'+(n||0).toLocaleString('en-NG');
+const $ = id => document.getElementById(id);
+
+/* ============ patient data ============ */
+const ME = {
+  first:'Amaka', last:'Eze', hn:'GH-024881', member:'AVN-4471-2288',
+  dob:'1991-04-12', sex:'female', bg:'O+', phone:'0803 123 4567',
+  plan:'Avon HMO', tier:'Premium', hmo:'Avon HMO',
+  allergies:['Penicillin'], conditions:[{name:'Hypertension',code:'I10',since:'2023'}],
+};
+const DATA = {
+  appointments:[
+    {id:'a1', dept:'General OPD', doctor:'Dr. Tunde Bello', type:'in-person', date:'in 2 days', time:'09:00', where:'Grandville Hospital'},
+    {id:'a2', dept:'Chest clinic', doctor:'Dr. Ada Nwosu', type:'video', date:'Fri', time:'10:30', where:'Video visit'},
+  ],
+  prescriptions:[
+    {id:'rx1', drug:'Amlodipine 5mg', sig:'1 tablet each morning', status:'Active', refill:true},
+    {id:'rx2', drug:'Paracetamol 1g', sig:'As needed for pain', status:'Completed', refill:false},
+  ],
+  deliveries:[
+    {id:'d1', drug:'Amlodipine 5mg x30', stage:1},
+  ],
+  benefits:[
+    {name:'Outpatient care', used:38000, limit:150000},
+    {name:'Drugs & pharmacy', used:52000, limit:80000},
+    {name:'Laboratory', used:12000, limit:60000},
+    {name:'Specialist & admission', used:0, limit:500000},
+    {name:'Dental & optical', used:15000, limit:40000},
+  ],
+  authorizations:[
+    {id:'au1', what:'Chest X-ray', where:'Grandville Hospital', status:'Approved', when:'Today'},
+    {id:'au2', what:'Specialist referral (Cardiology)', where:'Grandville Hospital', status:'Pending', when:'2h ago'},
+  ],
+  claims:[
+    {id:'c1', what:'Consultation + FBC', amount:8500, status:'Paid', when:'Last week'},
+    {id:'c2', what:'Antenatal review', amount:15200, status:'Processing', when:'3 days ago'},
+    {id:'c3', what:'Pharmacy top-up', amount:4000, status:'Query', when:'6 days ago', note:'Pre-authorisation code needed'},
+  ],
+  bills:[
+    {id:'b1', what:'Consultation (out-of-pocket share)', amount:500},
+  ],
+  results:[
+    {id:'r1', test:'Blood pressure', value:'128/82', unit:'mmHg', flag:'normal', when:'2 days ago'},
+    {id:'r2', test:'Haemoglobin', value:'12.6', unit:'g/dL', flag:'normal', low:12, high:16, cl:7, ch:20, when:'2 weeks ago'},
+    {id:'r3', test:'Fasting glucose', value:'5.4', unit:'mmol/L', flag:'normal', low:3.9, high:7.8, cl:2.5, ch:25, when:'2 weeks ago'},
+  ],
+  visits:[
+    {id:'v1', reason:'Hypertension review', doctor:'Dr. Tunde Bello', when:'2 days ago'},
+    {id:'v2', reason:'Malaria treatment', doctor:'Dr. Ada Nwosu', when:'4 months ago'},
+  ],
+  messages:[
+    {from:'them', who:'Dr. Tunde Bello', text:'Your recent BP readings look good. Keep taking the amlodipine each morning.', when:'2d'},
+    {from:'me', text:'Thank you doctor. Should I still reduce salt?', when:'2d'},
+    {from:'them', who:'Dr. Tunde Bello', text:'Yes, keep salt low and stay active. See you at your review.', when:'1d'},
+  ],
+  providers:[
+    {name:'Grandville Hospital', kind:'Hospital', area:'Surulere', km:1.2, covered:true},
+    {name:'Lagoon Clinic', kind:'Clinic', area:'Ikeja', km:4.5, covered:true},
+    {name:'HealthPlus Pharmacy', kind:'Pharmacy', area:'Yaba', km:2.1, covered:true},
+    {name:'Riverside Medical Centre', kind:'Hospital', area:'Lekki', km:9.8, covered:true},
+    {name:'CarePoint Diagnostics', kind:'Laboratory', area:'Ikoyi', km:6.3, covered:false},
+  ],
+  tips:[
+    {t:'Take your blood pressure medicine at the same time daily', p:'A steady routine keeps your readings stable. Morning works well with breakfast.'},
+    {t:'Cut back on salt, not on flavour', p:'Swap salt for pepper, ginger and herbs. Your heart will thank you.'},
+  ],
+};
+
+/* ============ QR (visual, deterministic) ============ */
+function qrSVG(seed){
+  let h=0; for(let i=0;i<seed.length;i++){ h=(h*31 + seed.charCodeAt(i))>>>0; }
+  const n=21, cells=[]; let x=h;
+  const rnd=()=>{ x^=x<<13; x>>>=0; x^=x>>17; x^=x<<5; x>>>=0; return x/4294967296; };
+  const finder=(r,c)=> (r<7&&c<7)||(r<7&&c>=n-7)||(r>=n-7&&c<7);
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){ if(finder(r,c)) continue; if(rnd()>0.55) cells.push([r,c]); }
+  let rects=cells.map(([r,c])=>`<rect x="${c}" y="${r}" width="1" height="1"/>`).join('');
+  const eye=(ox,oy)=>`<rect x="${ox}" y="${oy}" width="7" height="7" fill="none" stroke="#0C2A2E" stroke-width="1"/><rect x="${ox+2}" y="${oy+2}" width="3" height="3"/>`;
+  return `<svg viewBox="0 0 21 21" width="100%" height="100%" fill="#0C2A2E" shape-rendering="crispEdges">${rects}${eye(0,0)}${eye(14,0)}${eye(0,14)}</svg>`;
+}
+
+/* ============ nav ============ */
+const TABS=[
+  {id:'home', lab:'Home', ic:I.home},
+  {id:'care', lab:'Care', ic:I.care},
+  {id:'cover', lab:'Cover', ic:I.cover},
+  {id:'records', lab:'Records', ic:I.records},
+  {id:'chat', lab:'Chat', ic:I.chat},
+];
+let state={ tab:'home', stack:[], theme:'light' };
+
+/* ============ multi-language (app chrome) ============ */
+const LANGS=[{code:'en',name:'English'},{code:'yo',name:'Yor\u00f9b\u00e1'},{code:'ha',name:'Hausa'},{code:'ig',name:'Igbo'},{code:'pcm',name:'Pidgin'}];
+const STR={
+  'Home':{yo:'Il\u00e9',ha:'Gida',ig:'\u1ee4l\u1ecd',pcm:'Home'},
+  'Care':{yo:'It\u1ecdj\u00fa',ha:'Kulawa',ig:'Nlek\u1ecdta',pcm:'Care'},
+  'Cover':{yo:'\u00ccd\u00e1\u00e0b\u00f2',ha:'Inshora',ig:'Mkpuchi',pcm:'Cover'},
+  'Records':{yo:'\u00cckọsil\u1eb9\u0300',ha:'Bayanai',ig:'Ndek\u1ecd',pcm:'Records'},
+  'Chat':{yo:'\u1eb8r\u1ecd',ha:'Hira',ig:'Nkata',pcm:'Chat'},
+  'Good morning':{yo:'\u1eb8 k\u00e1\u00e0r\u00f2',ha:'Ina kwana',ig:'\u1ee4t\u1ee5t\u1ee5 \u1ecdma',pcm:'Good morning'},
+  'Good afternoon':{yo:'\u1eb8 k\u00e1as\u00e1n',ha:'Ina yini',ig:'Eh\u0323ihie \u1ecdma',pcm:'Good afternoon'},
+  'Good evening':{yo:'\u1eb8 k\u00farọl\u1eb9\u0301',ha:'Ina yamma',ig:'Mgbede \u1ecdma',pcm:'Good evening'},
+  'Quick actions':{yo:'\u00cc\u1e63e ky\u00e1ky\u00e1',ha:'Ayyuka cikin sauri',ig:'Omume ngwa ngwa',pcm:'Quick tins'},
+  'Book visit':{yo:'\u1e62e \u00ecp\u00e0d\u00e9',ha:'Yi ajiya',ig:'Deba nleta',pcm:'Book visit'},
+  'Video':{yo:'F\u00ecd\u00ec\u00f2',ha:'Bidiyo',ig:'Vidiyo',pcm:'Video'},
+  'Refill':{yo:'Kun p\u00e0d\u00ec',ha:'Sake cika',ig:'M\u00e9j\u00fap\u1ee5tagh\u1ecb',pcm:'Refill'},
+  'Find doctor':{yo:'Wa d\u00f3kt\u00e0',ha:'Nemo likita',ig:'Ch\u1ecdta d\u1ecdk\u1ecbta',pcm:'Find doctor'},
+  'Your care team':{yo:'\u1eccw\u1ecd\u0300 \u00ect\u1ecdj\u00fa r\u1eb9',ha:'Tawagar kulawa',ig:'\u1ee4l\u1ecd \u1ecdr\u1ee5 nlek\u1ecdta g\u1ecb',pcm:'Your care team'},
+  'Health tip':{yo:'\u00ccm\u1ecd\u0300r\u00e0n \u00ecl\u00e9ra',ha:'Shawarar lafiya',ig:'Nd\u1ee5m\u1ecdd\u1ee5 ah\u1ee5ike',pcm:'Health tip'},
+  'Language':{yo:'\u00c8d\u00e8',ha:'Harshe',ig:'As\u1ee5s\u1ee5',pcm:'Language'},
+  'Dark mode':{yo:'\u00ccpo d\u00fadu',ha:'Yanayin duhu',ig:'\u1eccn\u1ecdd\u1ee5 gbara \u1ecdch\u1ecbch\u1ecbr\u1ecb',pcm:'Dark mode'},
+  'Notifications':{yo:'\u00ccf\u00e8t\u00f2n\u00e0',ha:'Sanarwa',ig:'\u1ecckwa',pcm:'Notifications'},
+  'Log out':{yo:'Jade',ha:'Fita',ig:'P\u1ee5\u1ecd',pcm:'Comot'},
+};
+let LANG='en'; try{ const s=localStorage.getItem('mc:lang'); if(s)LANG=s; }catch(e){}
+function greetKey(){ const h=new Date().getHours(); return h<12?'Good morning':h<17?'Good afternoon':'Good evening'; }
+function t(k){ if(LANG==='en') return k; const e=STR[k]; return (e&&e[LANG])||k; }
+function setLang(code){ LANG=code; try{ localStorage.setItem('mc:lang',code); }catch(e){} closeSheet(); render(); toast('Language set to '+(LANGS.find(l=>l.code===code)||{}).name); }
+function openLang(){
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">${t('Language')}</div>
+  <p class="muted" style="font-size:.82rem;margin:0 0 12px">App menus change now. Clinical text stays in English until a native speaker reviews it.</p>
+  <div class="menu-card">`+LANGS.map(l=>`<div class="lrow tap" onclick="setLang('${l.code}')"><div class="grow"><div class="t">${l.name}</div></div>${LANG===l.code?svg(I.check,20):''}</div>`).join('')+`</div>`);
+}
+
+
+/* ---- API base: same origin when served by the backend, override for the phone build ---- */
+const API = (function(){
+  try { if (window.MEDICORE_API) return window.MEDICORE_API; } catch(e){}
+  const q = new URLSearchParams(location.search).get('api');
+  if (q) return q;
+  if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+  return 'http://localhost:4000'; // fallback for file:// preview
+})();
+let TOKEN = null;
+try { TOKEN = localStorage.getItem('mc:token'); } catch(e){}
+
+async function api(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({ 'Content-Type':'application/json' }, opts.headers||{});
+  if (TOKEN) headers.Authorization = 'Bearer ' + TOKEN;
+  const res = await fetch(API + path, { method: opts.method||'GET', headers, body: opts.body?JSON.stringify(opts.body):undefined });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || ('Request failed ('+res.status+')'));
+  return data;
+}
+
+/* ---- real auth ---- */
+let authMode = 'login';
+function toggleAuthMode(){
+  authMode = authMode==='login' ? 'register' : 'login';
+  $('authName').style.display = authMode==='register' ? 'block' : 'none';
+  $('authTitle').textContent = authMode==='register' ? 'Create your account' : 'Sign in to your account';
+  $('authBtn').textContent = authMode==='register' ? 'Create account' : 'Sign in';
+  $('authSwitchText').textContent = authMode==='register' ? 'Already have an account?' : 'New to MediCore?';
+  $('authSwitchBtn').textContent = authMode==='register' ? 'Sign in' : 'Create an account';
+  $('authErr').textContent = '';
+}
+async function submitAuth(){
+  const email = $('authEmail').value.trim(), password = $('authPass').value;
+  $('authErr').textContent = '';
+  $('authBtn').textContent = 'Signing in...';
+  try {
+    const r = await api('/api/auth/login', { method:'POST', body:{ email, password } });
+    TOKEN = r.token; try { localStorage.setItem('mc:token', TOKEN); } catch(e){}
+    await enterApp();
+  } catch(e){
+    $('authErr').textContent = e.message;
+    $('authBtn').textContent = 'Sign in';
+  }
+}
+async function enterApp(){
+  $('lock').classList.add('hide');
+  setTimeout(()=>{ $('lock').style.display='none'; }, 420);
+  $('app').style.visibility='visible';
+  $('tabbar').style.display='flex';
+  bootSkeleton();
+  try { await loadBundle(); startSpinePoll(); go('home', null, true); }
+  catch(e){ toast('Could not reach the server'); }
+}
+async function loadBundle(){
+  const b = await api('/api/me/bundle');
+  Object.assign(ME, b.me);
+  ['appointments','prescriptions','deliveries','benefits','authorizations','claims','bills','results','visits','messages','providers','wearables'].forEach(k=>{ DATA[k] = b[k] || []; });
+  try{ DATA.orders = await api('/api/patient/orders'); }catch(e){ DATA.orders=[]; }
+  try{ DATA.notif = await api('/api/notifications'); }catch(e){ DATA.notif={items:[],unread:0}; }
+  try{ DATA.track = await api('/api/patient/track'); }catch(e){ DATA.track={active:false}; }
+  try{ DATA.rxdel = await api('/api/patient/delivery'); }catch(e){ DATA.rxdel={active:false}; }
+}
+function logout(){ TOKEN=null; try{ localStorage.removeItem('mc:token'); }catch(e){} location.reload(); }
+function bootSkeleton(){
+  renderTabbar();
+  $('header').innerHTML='';
+  $('view').innerHTML = `<div style="margin-top:16px">
+    <div class="sk" style="height:26px;width:60%;margin-bottom:8px"></div>
+    <div class="sk" style="height:14px;width:40%;margin-bottom:22px"></div>
+    <div class="sk" style="height:96px;margin-bottom:14px"></div>
+    <div class="sk" style="height:110px;margin-bottom:14px"></div>
+    <div class="sk" style="height:150px"></div></div>`;
+  setTimeout(()=>{ go('home', null, true); }, 650);
+}
+function switchTab(t){ state.tab=t; state.stack=[]; render(); window.scrollTo(0,0); }
+function go(screen, arg, isTabRoot){
+  if(isTabRoot){ state.stack=[]; }
+  else { state.stack.push({screen, arg}); }
+  render(); window.scrollTo(0,0);
+}
+function back(){ state.stack.pop(); render(); window.scrollTo(0,0); }
+
+function render(){
+  const cur = state.stack.length ? state.stack[state.stack.length-1] : {screen:state.tab};
+  const S = SCREENS[cur.screen] || SCREENS[state.tab];
+  $('header').innerHTML = state.stack.length ? detailHeader(S.title) : rootHeader(cur.screen);
+  mcView(`<div class="screen">${S.body(cur.arg)}</div>`);
+  renderTabbar();
+  if(S.after) S.after(cur.arg);
+}
+function renderTabbar(){
+  $('tabbarInner').innerHTML = TABS.map(tb=>`<button class="tab ${state.tab===tb.id&&!state.stack.length?'on':state.tab===tb.id?'on':''}" onclick="switchTab('${tb.id}')">${svg(tb.ic,22)}<span class="lab">${t(tb.lab)}</span></button>`).join('');
+}
+function rootHeader(screen){
+  if(screen==='home'){
+    return `<div class="topbar">
+      <div class="avatar sm soft" onclick="openProfile()">${ME.first[0]}${ME.last[0]}</div>
+      <div class="tb-actions">
+        <button class="tb-btn" onclick="toggleTheme()">${svg(state.theme==='dark'?I.refresh:I.moon,20)}</button>
+        <button class="tb-btn" onclick="openAlerts()">${svg(I.bell,20)}<span class="dot" id="bellDot" style="display:${(DATA.notif&&DATA.notif.unread)?'block':'none'}"></span></button>
+      </div></div>`;
+  }
+  const titles={care:'Care', cover:'My cover', records:'Health record', chat:'Messages'};
+  return `<div class="topbar"><div class="tb-title" style="font-size:1.35rem;font-family:var(--fd);font-weight:600">${titles[screen]||''}</div></div>`;
+}
+function detailHeader(title){
+  return `<div class="topbar detail">
+    <button class="tb-back" onclick="back()">${svg(I.chev.replace('9 6l6 6-6 6','15 18l-6-6 6-6'),22)}</button>
+    <div class="tb-title">${title}</div></div>`;
+}
+
+/* ============ screens ============ */
+const SCREENS = {};
+
+/* ---- spine: patient orders + notifications ---- */
+function glanceHTML(){
+  const up=(DATA.appointments||[]).find(a=>a.status!=='completed');
+  const active=(DATA.orders||[]).filter(o=>!['collected','closed'].includes(o.status));
+  const hasCover=!!(ME.hmo);
+  const coverText=hasCover?`${ME.hmo}${ME.tier?(' \u00b7 '+ME.tier):''}`:(ME.plan||'Self-pay');
+  const chev=svg(I.chev,18);
+  return `<div class="section-h"><h2>Your care at a glance</h2></div>
+  <div class="card" style="padding:2px 14px">
+    <div class="lrow tap" onclick="${up?"go('appts')":"openBook()"}"><div class="avatar sm soft">${svg(I.calendar,18)}</div><div class="grow"><div class="k">Upcoming visit</div><div class="muted" style="font-size:.82rem">${up?`${up.doctor||up.dept} \u00b7 ${up.date}${up.time?(' '+up.time):''}`:'None booked \u2014 tap to book'}</div></div>${chev}</div>
+    <div class="lrow tap" onclick="switchTab('care')"><div class="avatar sm ${active.length?'gold':'soft'}">${svg(I.records,18)}</div><div class="grow"><div class="k">Active orders</div><div class="muted" style="font-size:.82rem">${active.length?`${active.length} in progress \u2014 labs & prescriptions`:'Nothing in progress'}</div></div>${active.length?`<span class="pill gold">${active.length}</span>`:svg(I.check,18)}</div>
+    <div class="lrow tap" onclick="switchTab('cover')" style="border-bottom:none"><div class="avatar sm soft">${svg(I.shield,18)}</div><div class="grow"><div class="k">Cover</div><div class="muted" style="font-size:.82rem">${coverText}</div></div><span class="pill ${hasCover?'green':'soft'}">${hasCover?'Active':'Self-pay'}</span></div>
+  </div>`;
+}
+function patientOrdersBlock(){ const os=(DATA.orders||[]); if(!os.length) return '';
+  return `<div class="section-h"><h2>Your orders</h2></div>`+os.slice(0,4).map(patientOrderRow).join(''); }
+function patientOrderRow(o){ const map={ordered:['gold','Ordered'],verified:['teal','Being prepared'],priced:['gold','Ready to pay'],in_progress:['teal','In progress'],ready:['green','Ready for pickup'],dispatched:['gold','Out for delivery'],delivered:['green','Delivered'],resulted:['green','Results ready'],closed:['green','Done'],collected:['soft','Collected']};
+  const m=map[o.status]||['soft',o.status]; const sub=(o.type==='lab'?'Lab':'Pharmacy')+' \u00b7 '+(o.hospital||'');
+  let body='';
+  if(o.type==='rx'&&o.status==='priced'&&o.items){
+    body=`<div class="mini" style="margin-top:8px">${o.items.map(it=>`${it.name} ×${it.qty} · ${ngn(it.price*it.qty)}`).join('<br>')}</div>
+      <div class="row between" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="k">Total drugs</div><div class="k mono">${ngn(o.drugTotal)}</div></div>
+      <div class="qrow" style="gap:8px;margin-top:10px"><button class="btn btn-line grow tap" onclick="payRx('${o.id}','collect')">Collect in person</button><button class="btn btn-primary grow tap" onclick="payRx('${o.id}','deliver')">Deliver to me</button></div>
+      <div class="mini" style="margin-top:6px;color:var(--faint)">Delivery adds a dispatch fee paid to the rider on delivery. Drugs are paid here.</div>`;
+  } else if(o.type==='rx'&&o.pickupCode&&['ready','dispatched'].includes(o.status)){
+    body=`<div class="card" style="margin-top:8px;background:var(--gold-soft,#FBEFD3);text-align:center;padding:12px">
+      <div class="mini">${o.fulfilment==='deliver'?'Show this code to the rider':'Show this code at the pharmacy'}</div>
+      <div style="font-size:1.6rem;font-weight:800;letter-spacing:5px;margin-top:2px">${o.pickupCode}</div>
+      ${o.fulfilment==='deliver'?`<div class="mini" style="margin-top:4px">Pay ${ngn(o.dispatchFee)} dispatch fee to the rider on delivery${o.address?(' · '+o.address):''}</div>`:`<div class="mini" style="margin-top:4px">Paid ${ngn(o.drugTotal)} · collect at ${o.hospital||'the pharmacy'}</div>`}</div>
+      ${(o.fulfilment==='deliver'&&o.status==='dispatched')?`<button class="btn btn-line btn-block tap" style="margin-top:8px" onclick="go('rxtrack','${o.id}')">Track delivery on map</button>`:''}`;
+  }
+  return `<div class="card" style="margin-bottom:10px"><div class="row"><div class="avatar sm ${o.type==='lab'?'soft':'gold'}">${svg(o.type==='lab'?I.records:I.pill,20)}</div>
+    <div class="grow"><div class="k">${o.label||''}</div><div class="muted" style="font-size:.82rem">${sub}</div></div><span class="pill ${m[0]}">${m[1]}</span></div>
+    ${o.result?`<div class="muted" style="font-size:.82rem;margin-top:8px">${o.result.map(r=>r.test+': '+r.value+(r.unit||'')).join(' \u00b7 ')}</div>`:''}${body}</div>`; }
+async function payRx(id,fulfilment){
+  if(fulfilment==='deliver'){ go('rxaddr',id); }
+  else { doPayRx(id,'collect'); }
+}
+// ---- delivery address picker: search + map pin + current location ----
+let DADDR={lat:null,lng:null,text:''}; let dlvPicker=null, dlvPickerEl=null; let dlvSearchTimer=null;
+SCREENS.rxaddr={ title:'Delivery address', body(id){ const start=(ME&&ME.homeLat!=null)?{lat:ME.homeLat,lng:ME.homeLng}:{lat:6.4966,lng:3.3512}; DADDR={lat:start.lat,lng:start.lng,text:(ME&&ME.address)||''};
+  return `<div class="card"><label class="mini" style="font-weight:700">Search for your address</label>
+    <input id="dlvSearch" autocomplete="off" placeholder="Start typing a street, area or landmark\u2026" oninput="onDlvSearch(this.value)" style="width:100%;margin-top:6px;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem">
+    <div id="dlvSuggest" style="margin-top:4px"></div></div>
+  <button class="btn btn-line btn-block tap" onclick="useDlvLocation()" style="display:flex;align-items:center;justify-content:center;gap:8px">${svg(I.pin,18)} Use my current location</button>
+  <div class="card" style="padding:8px;margin-top:12px"><div id="dlvMap" data-keep style="height:240px;border-radius:10px;overflow:hidden"></div>
+    <div class="mini" style="margin-top:6px;color:var(--faint)">Drag the pin or tap the map to set the exact spot.</div></div>
+  <div class="card"><label class="mini" style="font-weight:700">Delivery address</label>
+    <input id="dlvAddrText" value="${((ME&&ME.address)||'').replace(/"/g,'&quot;')}" placeholder="House number, street, area" oninput="DADDR.text=this.value" style="width:100%;margin-top:6px;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem"></div>
+  <div class="mini" style="margin:0 2px 10px;color:var(--faint)">You pay for the drugs now. The dispatch fee is paid to the rider on delivery.</div>
+  <button class="btn btn-primary btn-block bigbtn tap" onclick="confirmAddr('${id}')">Confirm address & pay for drugs</button>`;
+}, after(){ initDlvPicker(); } };
+function initDlvPicker(){ const el=document.getElementById('dlvMap'); if(!el||typeof MapKit==='undefined')return; if(dlvPickerEl!==el){ if(dlvPicker&&dlvPicker.destroy)dlvPicker.destroy(); dlvPicker=MapKit.createPicker(el,{start:{lat:DADDR.lat,lng:DADDR.lng},onPick:async(p)=>{ DADDR.lat=p.lat; DADDR.lng=p.lng; const name=await geoReverse(p.lat,p.lng); if(name){ DADDR.text=name; const t=document.getElementById('dlvAddrText'); if(t)t.value=name; } }}); dlvPickerEl=el; } }
+function onDlvSearch(q){ clearTimeout(dlvSearchTimer); const box=document.getElementById('dlvSuggest'); if(!q||q.trim().length<3){ if(box)box.innerHTML=''; return; } dlvSearchTimer=setTimeout(async()=>{ const res=await geoSearch(q.trim()); if(!box)return; if(!res.length){ box.innerHTML='<div class="mini" style="padding:8px;color:var(--faint)">No matches (address search needs internet). You can still drop the pin on the map.</div>'; return; } box.innerHTML=res.map((r,i)=>`<button class="btn btn-line tap" style="display:block;width:100%;text-align:left;margin-top:6px;font-size:.86rem;padding:10px" onclick="pickDlvSuggest(${i})">${(r.display_name||'').replace(/"/g,'&quot;')}</button>`).join(''); window.__dlvRes=res; },500); }
+function pickDlvSuggest(i){ const r=(window.__dlvRes||[])[i]; if(!r)return; DADDR.lat=parseFloat(r.lat); DADDR.lng=parseFloat(r.lon); DADDR.text=r.display_name||''; const t=document.getElementById('dlvAddrText'); if(t)t.value=DADDR.text; const s=document.getElementById('dlvSearch'); if(s)s.value=DADDR.text; const b=document.getElementById('dlvSuggest'); if(b)b.innerHTML=''; if(dlvPicker&&dlvPicker.setCenter)dlvPicker.setCenter(DADDR.lat,DADDR.lng); }
+function useDlvLocation(){ if(!navigator.geolocation){ toast('Location not available on this device'); return; } toast('Finding your location\u2026'); navigator.geolocation.getCurrentPosition(async(pos)=>{ DADDR.lat=pos.coords.latitude; DADDR.lng=pos.coords.longitude; if(dlvPicker&&dlvPicker.setCenter)dlvPicker.setCenter(DADDR.lat,DADDR.lng); const name=await geoReverse(DADDR.lat,DADDR.lng); if(name){ DADDR.text=name; const t=document.getElementById('dlvAddrText'); if(t)t.value=name; } toast('Location set'); }, ()=>toast('Could not get your location'), {enableHighAccuracy:true,timeout:8000}); }
+async function geoSearch(q){ try{ const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ng&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}}); if(!r.ok)return[]; return await r.json(); }catch(e){ return []; } }
+async function geoReverse(lat,lng){ try{ const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lng,{headers:{'Accept':'application/json'}}); if(!r.ok)return null; const j=await r.json(); return j.display_name||null; }catch(e){ return null; } }
+async function confirmAddr(id){ const address=((document.getElementById('dlvAddrText')||{}).value||DADDR.text||'').trim(); if(!address){ toast('Enter or pick a delivery address'); return; } await doPayRx(id,'deliver',{address,lat:DADDR.lat,lng:DADDR.lng}); }
+async function doPayRx(id,fulfilment,addr){ const address=fulfilment==='deliver'?((addr&&addr.address)||((document.getElementById('rxAddr')||{}).value||'').trim()):null;
+  const body={fulfilment,address}; if(addr&&addr.lat!=null){ body.lat=addr.lat; body.lng=addr.lng; }
+  try{ const r=await api('/api/patient/rx/'+id+'/pay',{method:'POST',body}); closeSheet&&closeSheet();
+    DATA.orders=await api('/api/patient/orders'); try{ DATA.rxdel=await api('/api/patient/delivery'); }catch(e){}
+    if(state.stack.length&&state.stack[state.stack.length-1].screen==='rxaddr') back();
+    render();
+    toast(fulfilment==='deliver'?('Paid. Rider booked. Your code is '+r.pickupCode):('Paid. Show code '+r.pickupCode+' at the pharmacy.'));
+  }catch(e){ toast(e.message); } }
+async function openAlerts(){ let n; try{ n=await api('/api/notifications'); }catch(e){ n={items:[]}; }
+  const items=(n.items||[]).slice(0,20).map(x=>`<div class="lrow"><div class="grow"><div class="s">${x.text}</div></div></div>`).join('')||'<div class="lrow"><div class="s muted">No notifications yet</div></div>';
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Notifications</div><div class="menu-card">${items}</div>`);
+  try{ await api('/api/notifications/read',{method:'POST',body:{}}); if(DATA.notif) DATA.notif.unread=0; if(!state.stack.length && state.tab==='home') render(); }catch(e){}
+}
+let spinePoll=null;
+function startSpinePoll(){ if(spinePoll)return; spinePoll=setInterval(async()=>{ try{
+    DATA.orders=await api('/api/patient/orders'); DATA.notif=await api('/api/notifications');
+    try{ DATA.track=await api('/api/patient/track'); }catch(e){ DATA.track={active:false}; }
+    try{ DATA.rxdel=await api('/api/patient/delivery'); }catch(e){ DATA.rxdel={active:false}; }
+    if(state.stack.length){ if(state.stack[state.stack.length-1].screen==='track') paintTrack(); return; }
+    if(state.tab==='home') paintHome();
+  }catch(e){} }, 5000); }
+// update the home screen in place (notif dot + tracking banner) without a full re-render / scroll jump
+function paintHome(){ const dot=document.getElementById('bellDot'); if(dot) dot.style.display=(DATA.notif&&DATA.notif.unread)?'block':'none';
+  const b=document.getElementById('trackBanner'); if(b){ mcMorph(b,trackBannerHTML()); }
+  const g=document.getElementById('glanceCard'); if(g){ mcMorph(g,glanceHTML()); }
+  const db2=document.getElementById('delivBanner'); if(db2){ mcMorph(db2,delivBannerHTML()); }
+  paintHomeMini(); paintDelivMini(); }
+let homeMapObj=null, homeMapEl=null;
+function paintHomeMini(){ if(typeof MapKit==='undefined')return; const tk=DATA.track; const box=document.getElementById('homeMiniMap'); if(!box)return;
+  if(!tk||!tk.active){ if(box.innerHTML){ box.innerHTML=''; } if(homeMapObj){ homeMapObj.destroy(); homeMapObj=null; homeMapEl=null; } return; }
+  if(!document.getElementById('homeMap')){ box.innerHTML=`<div class="section-h"><h2>Your ambulance</h2><span class="more tap" onclick="go('track')">Full screen \u203a</span></div><div class="card tap" style="padding:8px" onclick="go('track')"><div id="homeMap" data-keep style="height:170px;border-radius:10px;overflow:hidden"></div></div>`; homeMapObj=null; homeMapEl=null; }
+  const el=document.getElementById('homeMap'); if(el && homeMapEl!==el){ if(homeMapObj)homeMapObj.destroy(); homeMapObj=MapKit.create(el,{bounds:tk.bounds}); homeMapEl=el; }
+  if(homeMapObj){ const u=tk.unit; homeMapObj.update({ units:u?[u]:[], me:MapKit.ridePos(u,tk.pickup), hospital:(u&&['transporting','athospital'].includes(u.status)&&tk.hospital)?tk.hospital:null, route:u?u.route:null, bounds:tk.bounds }); } }
+function delivBannerHTML(){ const d=DATA.rxdel; if(!d||!d.active) return ''; const st={queued:'is being prepared at the pharmacy',transit:'is on the way to you',arriving:'has arrived \u2014 have your code ready',delivered:'delivered'}[d.status]||'is on the way'; const eta=(d.status==='transit'&&d.etaSec!=null)?(' \u00b7 ETA '+Math.max(1,Math.round(d.etaSec/60))+' min'):''; return `<button class="card tap" style="width:100%;border:none;text-align:left;background:var(--gold,#E9B23C);color:#3a2a06;margin:2px 0 10px" onclick="go('rxtrack','${d.orderId}')"><div class="row"><div class="avatar sm" style="background:rgba(0,0,0,.12);color:#3a2a06">${svg(I.pill,20)}</div><div class="grow"><div class="k" style="color:#3a2a06">Your medication ${st}${eta}</div><div style="font-size:.8rem;opacity:.85">Tap to track the rider on the map</div></div></div></button>`; }
+let delivMapObj=null, delivMapEl=null;
+function paintDelivMini(){ if(typeof MapKit==='undefined')return; const d=DATA.rxdel; const box=document.getElementById('delivMiniMap'); if(!box)return;
+  if(!d||!d.active){ if(box.innerHTML){ box.innerHTML=''; } if(delivMapObj){ delivMapObj.destroy(); delivMapObj=null; delivMapEl=null; } return; }
+  if(!document.getElementById('delivMiniInner')){ box.innerHTML=`<div class="section-h"><h2>Your medication</h2><span class="more tap" onclick="go('rxtrack','${d.orderId}')">Full screen \u203a</span></div><div class="card tap" style="padding:8px" onclick="go('rxtrack','${d.orderId}')"><div id="delivMiniInner" data-keep style="height:170px;border-radius:10px;overflow:hidden"></div></div>`; delivMapObj=null; delivMapEl=null; }
+  const el=document.getElementById('delivMiniInner'); if(el && delivMapEl!==el){ if(delivMapObj)delivMapObj.destroy(); delivMapObj=MapKit.create(el,{}); delivMapEl=el; }
+  if(delivMapObj){ const rider=d.rider?[{id:'rider',lat:d.rider.lat,lng:d.rider.lng,status:(d.status==='arriving'?'onscene':'enroute'),name:'Rider'}]:[]; delivMapObj.update({ units:rider, me:(d.dropoff&&d.dropoff.lat!=null)?{lat:d.dropoff.lat,lng:d.dropoff.lng}:null, hospital:(d.pickup&&d.pickup.lat!=null)?{lat:d.pickup.lat,lng:d.pickup.lng,name:d.pickup.name||'Pharmacy'}:null, route:(d.pickup&&d.dropoff&&d.dropoff.lat!=null)?[[d.pickup.lat,d.pickup.lng],[d.dropoff.lat,d.dropoff.lng]]:null }); } }
+function trackBannerHTML(){ const tk=DATA.track; if(!tk||!tk.active) return ''; const u=tk.unit; const st=u?({enroute:'on the way to you',onscene:'has arrived at your location',transporting:'taking you to hospital',athospital:'arrived at the hospital'}[u.status]||'assigned'):'being assigned';
+  const eta=(u&&u.eta!=null&&['enroute','transporting'].includes(u.status))?` \u00b7 ETA ${Math.max(1,Math.round(u.eta/60))} min`:'';
+  return `<button class="card tap" style="width:100%;border:none;text-align:left;background:var(--teal);color:#fff;margin:2px 0 10px" onclick="go('track')"><div class="row"><div class="avatar sm" style="background:rgba(255,255,255,.2);color:#fff">${svg(I.truck,20)}</div><div class="grow"><div class="k" style="color:#fff">Ambulance ${st}${eta}</div><div style="font-size:.8rem;opacity:.92">Tap to track live on the map</div></div></div></button>`; }
+
+// ---- SOS: choose which registered hospital + the pickup point ----
+let SOS={hosp:null,pickup:'home',lat:null,lng:null};
+async function sosConfirm(){ let hosps=[]; try{ hosps=await api('/api/patient/hospitals'); }catch(e){}
+  SOS={hosp:(hosps[0]||{}).id||null,pickup:'home',lat:null,lng:null};
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:6px">Call an ambulance</div><p class="muted" style="font-size:.86rem;margin:0 0 12px">An ambulance from the hospital you choose will be dispatched. Only use this for a real emergency.</p>
+  <div class="field"><label>What is happening?</label><select id="sosKind"><option>Medical emergency</option><option>Chest pain</option><option>Difficulty breathing</option><option>Serious injury / accident</option><option>Labour / obstetric</option></select></div>
+  <div class="field"><label>Which hospital?</label><select id="sosHosp">${hosps.map(h=>`<option value="${h.id}">${h.name} \u00b7 ${h.area||''}</option>`).join('')||'<option>No registered hospital</option>'}</select></div>
+  <div class="field"><label>Pickup location</label>
+    <button class="btn btn-line btn-block tap" id="pkHome" onclick="setPickup('home')" style="margin-bottom:8px">${svg(I.home||I.pin,17)} My home address${ME.address?` (${ME.address})`:''}</button>
+    <button class="btn btn-line btn-block tap" id="pkGps" onclick="setPickup('gps')">${svg(I.pin,17)} Use my current location</button>
+    <div class="mini" id="pkNote" style="margin-top:6px;color:var(--faint)">Using your saved home address.</div>
+  </div>
+  <button class="btn btn-block btn-lg tap" style="background:var(--coral);color:#fff" onclick="sendSOS()">Call ambulance now</button>`);
+}
+function setPickup(kind){ SOS.pickup=kind; const note=$('pkNote'); const home=$('pkHome'), gps=$('pkGps');
+  if(home)home.style.borderColor=kind==='home'?'var(--coral)':'var(--line)'; if(gps)gps.style.borderColor=kind==='gps'?'var(--coral)':'var(--line)';
+  if(kind==='home'){ SOS.lat=null; SOS.lng=null; if(note)note.textContent='Using your saved home address.'; return; }
+  if(note)note.textContent='Getting your current location...';
+  if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(p=>{ SOS.lat=p.coords.latitude; SOS.lng=p.coords.longitude; if(note)note.textContent='Current location locked in.'; }, ()=>{ if(note)note.textContent='Could not get GPS; will use your home address instead.'; SOS.pickup='home'; SOS.lat=null; SOS.lng=null; }); }
+  else { if(note)note.textContent='This device has no GPS; using home address.'; SOS.pickup='home'; }
+}
+async function sendSOS(){ const kind=($('sosKind')||{}).value||'Medical emergency'; const hosp=($('sosHosp')||{}).value||SOS.hosp;
+  const body={kind,hospitalId:hosp}; if(SOS.pickup==='gps'&&SOS.lat!=null){ body.lat=SOS.lat; body.lng=SOS.lng; }
+  try{ await api('/api/patient/sos',{method:'POST',body}); closeSheet(); DATA.track=await api('/api/patient/track'); toast('Ambulance requested. Track it live.'); go('track'); }catch(e){ toast(e.message); } }
+
+// ---- live tracking screen ----
+SCREENS.track={ title:'Live tracking', body(){ const tk=DATA.track;
+  if(!tk||!tk.active) return `<div class="screen"><div class="empty" style="margin-top:40px"><div class="t">No active ambulance</div><div style="font-size:.88rem">When you request an ambulance, you can track it here live.</div></div></div>`;
+  const u=tk.unit; const stTxt=u?({enroute:'On the way to you',onscene:'Arrived at your location',transporting:'Taking you to hospital',athospital:'Arrived at the hospital'}[u.status]||'Assigned'):'Being assigned';
+  const eta=(u&&u.eta!=null&&['enroute','transporting'].includes(u.status))?`ETA ${Math.max(1,Math.round(u.eta/60))} min`:'';
+  return `<div class="card" style="background:var(--teal);color:#fff"><div class="row between"><div><div style="font-size:.78rem;opacity:.85;text-transform:uppercase;letter-spacing:.08em;font-weight:700">${u?u.name:'Ambulance'}</div><div style="font-size:1.25rem;font-weight:800" id="trkStatus">${stTxt}</div></div><div style="text-align:right;font-weight:700" id="trkEta">${eta}</div></div></div>
+  <div class="card" style="padding:10px"><div id="trackMap" data-keep style="height:300px;border-radius:12px;overflow:hidden"></div></div>
+  <div class="card"><div class="mini">${svg(I.pin,13)} Pickup: ${tk.pickup&&tk.pickup.address?tk.pickup.address:'your location'}</div>${tk.hospital?`<div class="mini" style="margin-top:6px">${svg(I.home||I.pin,13)} Destination: ${tk.hospital.name}</div>`:''}</div>
+  <div class="section-h"><h2>Chat with the ambulance</h2></div>
+  <div class="card"><div id="trkChat" style="max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:8px">${chatHTML(tk.chat||[],'patient')}</div>
+    <div class="row" style="gap:8px;margin-top:10px"><input id="trkMsg" placeholder="Message the crew…" style="flex:1;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)" onkeydown="if(event.key==='Enter')sendTrackMsg()"><button class="btn btn-gold tap" style="padding:11px 16px" onclick="sendTrackMsg()">Send</button></div></div>`;
+}, after(){ ensureTrackMap(); paintTrack(); const c=document.getElementById('trkChat'); if(c)c.scrollTop=c.scrollHeight; } };
+function chatHTML(msgs,meSide){ if(!msgs||!msgs.length) return '<div class="mini" style="text-align:center;padding:10px">No messages yet. Say hello or share details.</div>'; return msgs.map(m=>{ const mine=m.from===meSide; return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%"><div style="background:${mine?'var(--teal)':'var(--surface-2,#EDF3F3)'};color:${mine?'#fff':'var(--ink)'};padding:8px 12px;border-radius:14px;font-size:.9rem">${(m.text||'').replace(/</g,'&lt;')}</div><div class="mini" style="font-size:.68rem;margin-top:2px;${mine?'text-align:right':''}">${mine?'You':(m.fromName||'Crew')} · ${new Date(m.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>`; }).join(''); }
+async function sendTrackMsg(){ const i=document.getElementById('trkMsg'); const text=(i.value||'').trim(); if(!text)return; i.value=''; try{ const r=await api('/api/patient/track/chat',{method:'POST',body:{text}}); if(DATA.track)DATA.track.chat=r.chat; const c=document.getElementById('trkChat'); if(c){c.innerHTML=chatHTML(r.chat,'patient');c.scrollTop=c.scrollHeight;} }catch(e){ toast(e.message); } }
+// ---- track a medication delivery (pharmacy -> rider -> me) ----
+SCREENS.rxtrack={ title:'Track delivery', body(){ return `<div class="card" style="padding:10px"><div id="rxTrackMap" data-keep style="height:280px;border-radius:12px;overflow:hidden"></div></div><div id="rxTrackInfo" class="card"><div class="mini">Loading your delivery…</div></div>`; }, after(){ ensureRxMap(); loadRxTrack(); startRxPoll(); } };
+let rxMapObj=null, rxMapEl=null, rxPoll=null;
+function ensureRxMap(){ if(typeof MapKit==='undefined')return; const el=document.getElementById('rxTrackMap'); if(!el){rxMapEl=null;return;} if(rxMapEl!==el){ if(rxMapObj)rxMapObj.destroy(); rxMapObj=MapKit.create(el,{}); rxMapEl=el; } }
+async function loadRxTrack(){ const cur=state.stack[state.stack.length-1]; const id=cur&&cur.arg; if(!id)return; try{ const t=await api('/api/patient/rx/'+id+'/track'); paintRxTrack(t); }catch(e){} }
+function paintRxTrack(t){ ensureRxMap(); if(rxMapObj&&t){ const rider=t.rider?[{id:'rider',lat:t.rider.lat,lng:t.rider.lng,status:(t.status==='arriving'?'onscene':'enroute'),name:'Rider'}]:[]; rxMapObj.update({ units:rider, me:(t.dropoff&&t.dropoff.lat!=null)?{lat:t.dropoff.lat,lng:t.dropoff.lng}:null, hospital:(t.pickup&&t.pickup.lat!=null)?{lat:t.pickup.lat,lng:t.pickup.lng,name:t.pickup.name||'Pharmacy'}:null, route:(t.pickup&&t.dropoff&&t.dropoff.lat!=null)?[[t.pickup.lat,t.pickup.lng],[t.dropoff.lat,t.dropoff.lng]]:null }); }
+  const info=document.getElementById('rxTrackInfo'); if(info){ const lbl={queued:'At the pharmacy',transit:'On the way to you',arriving:'Arriving now',delivered:'Delivered'}[t.status]||t.status||''; mcMorph(info,`<div class="k">${t.label||'Your medication'}</div><div class="mini" style="margin-top:4px">${lbl}${t.dispatchFee?(' · pay '+ngn(t.dispatchFee)+' to the rider'):''}</div>${t.code?`<div class="mini" style="margin-top:6px">Give the rider code <b style="letter-spacing:2px">${t.code}</b> to confirm handover.</div>`:''}`); } }
+function startRxPoll(){ if(rxPoll)return; rxPoll=setInterval(async()=>{ const cur=state.stack[state.stack.length-1]; if(!cur||cur.screen!=='rxtrack'){ clearInterval(rxPoll); rxPoll=null; return; } await loadRxTrack(); },2000); }
+let trackMapObj=null, trackMapEl=null;
+function ensureTrackMap(){ if(typeof MapKit==='undefined')return; const el=document.getElementById('trackMap'); if(!el){trackMapEl=null;return;} if(trackMapEl!==el){ if(trackMapObj)trackMapObj.destroy(); trackMapObj=MapKit.create(el,{bounds:(DATA.track||{}).bounds}); trackMapEl=el; } }
+function paintTrack(){ const tk=DATA.track; if(!tk||!tk.active){ if(state.stack.length&&state.stack[state.stack.length-1].screen==='track') render(); return; }
+  ensureTrackMap(); if(trackMapObj){ const u=tk.unit; trackMapObj.update({ units:u?[u]:[], me:MapKit.ridePos(u,tk.pickup), hospital:(u&&['transporting','athospital'].includes(u.status)&&tk.hospital)?tk.hospital:null, route:u?u.route:null, bounds:tk.bounds }); }
+  const u=tk.unit; const s=document.getElementById('trkStatus'); const e=document.getElementById('trkEta');
+  if(s&&u) s.textContent=({enroute:'On the way to you',onscene:'Arrived at your location',transporting:'Taking you to hospital',athospital:'Arrived at the hospital'}[u.status]||'Assigned');
+  if(e) e.textContent=(u&&u.eta!=null&&['enroute','transporting'].includes(u.status))?`ETA ${Math.max(1,Math.round(u.eta/60))} min`:'';
+  const c=document.getElementById('trkChat'); if(c){ const atBottom=c.scrollHeight-c.scrollTop-c.clientHeight<40; c.innerHTML=chatHTML(tk.chat||[],'patient'); if(atBottom)c.scrollTop=c.scrollHeight; } }
+
+// ---- edit home address (text + set coordinates from current GPS) ----
+function hospitalCardHTML(){
+  const hn=(ME.hospitalName) || (ME.hospitalId?'Your hospital':null);
+  if(!ME.hospitalId){
+    return `<div class="card" style="background:var(--gold-soft);margin-bottom:12px"><div class="k">Not attached to a hospital</div><div class="mini" style="margin-top:4px">A hospital's front desk can register you. You can only belong to one hospital at a time.</div></div>`;
+  }
+  if(ME.transferRequested){
+    return `<div class="card" style="margin-bottom:12px"><div class="row"><div class="avatar sm soft">${svg(I.shield,18)}</div><div class="grow"><div class="k">Transfer requested</div><div class="mini" style="margin-top:2px">Waiting for ${hn||'your hospital'} to approve your removal. Then another hospital can register you.</div></div></div>
+      <button class="btn btn-line btn-block tap" style="margin-top:10px" onclick="cancelTransfer()">Cancel request</button></div>`;
+  }
+  return `<div class="card" style="margin-bottom:12px"><div class="row"><div class="avatar sm" style="background:var(--teal);color:#fff">${svg(I.shield,18)}</div><div class="grow"><div class="k">Your hospital</div><div class="mini" style="margin-top:2px">${hn||'Registered'} \u00b7 one hospital at a time</div></div></div>
+    <button class="btn btn-line btn-block tap" style="margin-top:10px" onclick="requestTransfer()">Request removal / move hospital</button></div>`;
+}
+function requestTransfer(){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:6px">Move to another hospital?</div>
+  <p class="muted" style="font-size:.86rem;margin:0 0 14px">This asks your current hospital to remove you. Once approved you'll be unattached and another hospital's front desk can register you. You can't be at two hospitals at once.</p>
+  <button class="btn btn-block btn-lg tap" style="background:var(--coral);color:#fff" onclick="doRequestTransfer()">Request removal</button>`); }
+async function doRequestTransfer(){ try{ await api('/api/patient/transfer-request',{method:'POST'}); ME.transferRequested=true; closeSheet(); render(); toast('Request sent to your hospital'); }catch(e){ toast(e.message); } }
+async function cancelTransfer(){ try{ await api('/api/patient/transfer-cancel',{method:'POST'}); ME.transferRequested=false; render(); toast('Request cancelled'); }catch(e){ toast(e.message); } }
+function editAddress(){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:8px">Home address</div>
+  <div class="field"><label>Address</label><input id="addrText" value="${(ME.address||'').replace(/"/g,'&quot;')}" placeholder="e.g. 15 Adeniran Ogunsanya St, Surulere"></div>
+  <div class="mini" id="addrNote" style="margin-bottom:10px;color:var(--faint)">${ME.homeLat?'Location pin is set.':'Set a location pin so ambulances can find you.'}</div>
+  <button class="btn btn-line btn-block tap" onclick="useGpsForHome()" style="margin-bottom:8px">${svg(I.pin,17)} Set pin to my current location</button>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="saveAddress()">Save</button>`); }
+let ADDR={lat:null,lng:null};
+function useGpsForHome(){ const n=$('addrNote'); if(!navigator.geolocation){ if(n)n.textContent='This device has no GPS.'; return; } if(n)n.textContent='Getting your location...'; navigator.geolocation.getCurrentPosition(p=>{ ADDR.lat=p.coords.latitude; ADDR.lng=p.coords.longitude; if(n)n.textContent='Pin locked to your current location.'; }, ()=>{ if(n)n.textContent='Could not get your location.'; }); }
+async function saveAddress(){ const address=($('addrText')||{}).value||''; const body={address}; if(ADDR.lat!=null){ body.lat=ADDR.lat; body.lng=ADDR.lng; } try{ const r=await api('/api/patient/address',{method:'POST',body}); ME.address=r.address; ME.homeLat=r.homeLat; ME.homeLng=r.homeLng; ADDR={lat:null,lng:null}; closeSheet(); toast('Home address saved'); }catch(e){ toast(e.message); } }
+
+/* ---- HOME ---- */
+SCREENS.home = { body(){
+  const appt=DATA.appointments.find(a=>a.status!=='completed');
+  const tip=DATA.tips[0];
+  return `
+  <div class="greeting"><div class="hello">${t(greetKey())},<br>${ME.first}.</div>
+  <div class="sub">Here is your health today.</div></div>
+
+  <div id="glanceCard">${glanceHTML()}</div>
+
+  <div id="trackBanner">${trackBannerHTML()}</div>
+  <div id="homeMiniMap"></div>
+  <div id="delivBanner">${delivBannerHTML()}</div>
+  <div id="delivMiniMap"></div>
+  <button class="card tap" style="width:100%;border:none;text-align:left;background:var(--coral);color:#fff;margin:2px 0 4px" onclick="sosConfirm()"><div class="row"><div class="avatar sm" style="background:rgba(255,255,255,.2);color:#fff">${svg('M12 5v14M5 12h14',20)}</div><div class="grow"><div class="k" style="color:#fff">Emergency</div><div style="font-size:.8rem;opacity:.92">Call an ambulance to your location</div></div></div></button>
+  <div class="mini tap" style="margin:2px 2px 4px;color:var(--muted)" onclick="editAddress()">${svg(I.pin,12)} ${ME.address?('Home: '+ME.address):'Set your home address for faster pickup'} \u203a</div>
+
+  <div class="section-h"><h2>${t('Quick actions')}</h2></div>
+  <div class="qa-grid">
+    <button class="qa tap" onclick="openBook()"><span class="ic">${svg(I.calendar,22)}</span><span class="lab">${t('Book visit')}</span></button>
+    <button class="qa tap" onclick="VISIT=null;go('video')"><span class="ic">${svg(I.video,22)}</span><span class="lab">${t('Video')}</span></button>
+    <button class="qa tap" onclick="go('rx')"><span class="ic">${svg(I.pill,22)}</span><span class="lab">${t('Refill')}</span></button>
+    <button class="qa tap" onclick="go('doctors')"><span class="ic">${svg(I.care,22)}</span><span class="lab">${t('Find doctor')}</span></button>
+  </div>
+
+  ${appt?`<div class="section-h"><h2>Coming up</h2><span class="more" onclick="go('appts')">See all</span></div>
+  <div class="card tap" onclick="go('appts')">
+    <div class="row">
+      <div class="avatar sm ${appt.type==='video'?'gold':'soft'}">${svg(appt.type==='video'?I.video:I.calendar,20)}</div>
+      <div class="grow"><div class="k">${appt.dept}</div><div class="muted" style="font-size:.82rem">${appt.doctor} \u00b7 ${appt.where}</div></div>
+      <div class="col" style="align-items:flex-end"><div class="k mono">${appt.time}</div><div class="faint" style="font-size:.76rem">${appt.date}</div></div>
+    </div>
+  </div>`:''}
+
+  ${patientOrdersBlock()}
+
+  <div class="section-h"><h2>For you</h2></div>
+  <div class="tip"><div class="orb"></div>
+    <div class="eyebrow">HEALTH TIP</div>
+    <h3>${tip.t}</h3><p>${tip.p}</p>
+  </div>
+
+  <div class="section-h"><h2>Your care team</h2></div>
+  <div class="card">
+    <div class="lrow"><div class="avatar sm soft">TB</div><div class="grow"><div class="t">Dr. Tunde Bello</div><div class="s">Consultant Physician</div></div>
+      <button class="btn btn-soft" style="padding:9px 14px" onclick="switchTab('chat')">Message</button></div>
+  </div>
+  <div style="height:8px"></div>`;
+}, after(){ paintHomeMini(); paintDelivMini(); } };
+
+/* ---- CARE (hub) ---- */
+SCREENS.care = { body(){
+  return `<div style="margin-top:8px"></div>
+  <div class="menu-card">
+    ${careRow('care','Find a doctor','Search and book any doctor, any hospital',"go('doctors')")}
+    ${careRow('calendar','Appointments','Book or manage your visits',"go('appts')")}
+    ${careRow('video','Video consultation','See a doctor from home',"VISIT=null;go('video')")}
+    ${careRow('pill','Prescriptions','Your medicines and refills',"go('rx')")}
+    ${careRow('truck','Medicine delivery','Track medicine to your door',"go('delivery')")}
+    ${careRow('hospital','Find a hospital','Covered hospitals and pharmacies near you',"go('providers')")}
+  </div>
+  <div class="section-h"><h2>Right now</h2></div>
+  ${DATA.deliveries.length?`<div class="card tap" onclick="go('delivery')"><div class="row"><div class="lrow" style="padding:0;border:none"><div class="ic gold">${svg(I.truck,20)}</div></div><div class="grow"><div class="k">Amlodipine on the way</div><div class="muted" style="font-size:.82rem">Out for delivery soon</div></div>${svg(I.chev,20)}</div></div>`:''}
+  <div style="height:8px"></div>`;
+}};
+function careRow(ic,t,s,onclick){
+  return `<div class="lrow tap" onclick="${onclick}"><div class="ic">${svg(I[ic],20)}</div><div class="grow"><div class="t">${t}</div><div class="s">${s}</div></div><span class="chev">${svg(I.chev,20)}</span></div>`;
+}
+
+/* ---- Appointments ---- */
+SCREENS.appts = { title:'Appointments', body(){
+  return `<div style="margin-top:8px"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="openBook()">${svg(I.plus,20)}Book a visit</button>
+  <div class="section-h"><h2>Upcoming</h2></div>
+  ${DATA.appointments.map(a=>`
+    <div class="card" style="margin-bottom:12px">
+      <div class="row">
+        <div class="avatar sm ${a.type==='video'?'gold':'soft'}">${svg(a.type==='video'?I.video:I.calendar,20)}</div>
+        <div class="grow"><div class="k">${a.dept}</div><div class="muted" style="font-size:.82rem">${a.doctor}</div></div>
+        <span class="pill ${a.type==='video'?'gold':'teal'}">${a.type==='video'?'Video':'In person'}</span>
+      </div>
+      <div class="row between" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+        <div class="muted" style="font-size:.84rem">${svg(I.calendar,15)} ${a.date}, ${a.time}${a.fee!=null?(' \u00b7 '+ngn(a.fee)):''}</div>
+        ${apptJoinBtn(a)}
+      </div>
+    </div>`).join('')}
+  <div style="height:8px"></div>`;
+}};
+
+/* ---- Video ---- */
+function apptTime(a){ return a.scheduledAt?new Date(a.scheduledAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):(a.time||''); }
+function apptJoinBtn(a){
+  if(a.type!=='video') return `<button class="btn btn-line" style="padding:9px 16px" onclick="toast('Reminder set. We will notify you.')">Remind me</button>`;
+  if(a.joinable===false) return `<button class="btn btn-line" style="padding:9px 16px;opacity:.55" onclick="toast('This visit opens at ${apptTime(a)}. Please come back then.')">Opens ${apptTime(a)}</button>`;
+  return `<button class="btn btn-gold" style="padding:9px 16px" onclick="joinVisit('${a.id}')">Join</button>`;
+}
+async function joinVisit(id){ try{ await api('/api/appointments/'+id+'/join',{method:'POST'}); VISIT=id; go('video'); }catch(e){ toast(e.message); } }
+let VISIT=null;
+let RTC=null;
+SCREENS.video = { title:'Video visit', body(){
+  const appt=(DATA.appointments||[]).find(a=>a.id===VISIT);
+  const who=appt?appt.doctor:'your doctor';
+  return `<div style="margin-top:12px"></div>
+  <div class="video-stage" style="aspect-ratio:3/4">
+    <video id="rtcRemote" data-keep autoplay playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#04171a"></video>
+    <div id="rtcStatus" class="live" style="background:rgba(20,112,122,.92)">Connecting…</div>
+    <div class="self" style="overflow:hidden;padding:0"><video id="rtcLocal" data-keep autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video></div>
+    <div id="rtcWaiting" class="col" style="align-items:center;color:#fff;position:absolute;inset:0;justify-content:center;pointer-events:none">
+      <div class="avatar lg" style="background:rgba(255,255,255,.14);margin-bottom:10px">${(who||'Dr').split(' ').slice(-1)[0][0]||'D'}</div>
+      <div style="font-weight:600">${who}</div>
+      <div style="color:#8FD0D2;font-size:.84rem">Waiting to connect…</div>
+    </div>
+  </div>
+  <div class="vcontrols">
+    <button class="vbtn" id="rtcMic" onclick="rtcMic()">${svg(I.mic,22)}</button>
+    <button class="vbtn" id="rtcCam" onclick="rtcCam()">${svg(I.cam,22)}</button>
+    <button class="vbtn end" onclick="rtcHang()">${svg(I.phone,22)}</button>
+  </div>
+  ${VISIT?'':'<div class="card" style="margin-top:16px"><div class="muted" style="font-size:.86rem">This is a camera self-test. To connect with a doctor, join a booked video visit from your appointments at its scheduled time.</div></div>'}
+  <div class="card" style="margin-top:14px"><div class="row"><div class="lrow" style="padding:0;border:none"><div class="ic green">${svg(I.check,20)}</div></div><div class="grow" style="font-size:.86rem">Anything the doctor prescribes on this call goes straight to your record and pharmacy. No paper, no second trip.</div></div></div>`;
+}, after(){ startRtc(); } };
+async function startRtc(){
+  const remote=document.getElementById('rtcRemote'), local=document.getElementById('rtcLocal');
+  if(!VISIT){ try{ const s=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); if(local){local.srcObject=s;local.muted=true;local.play().catch(()=>{});} setRtcStatus('Self-test'); }catch(e){ setRtcStatus('No camera'); } return; }
+  try{
+    RTC=await MediCoreRTC.start({ base:API, token:TOKEN, room:VISIT, localEl:local, remoteEl:remote,
+      onState:(s)=>{ if(s==='connected'){ setRtcStatus('● Live'); const w=document.getElementById('rtcWaiting'); if(w)w.style.display='none'; document.getElementById('rtcStatus').style.background='rgba(223,80,57,.92)'; }
+        else if(s==='ended'){ setRtcStatus('Ended'); } else if(s==='waiting'){ setRtcStatus('Waiting for doctor…'); } else if(s==='requesting-media'){ setRtcStatus('Starting camera…'); } },
+      onError:(e)=>{ toast(e.message||'Could not start the call'); } });
+  }catch(e){ setRtcStatus('Unavailable'); }
+}
+function setRtcStatus(t){ const el=document.getElementById('rtcStatus'); if(el)el.textContent=t; }
+function rtcMic(){ if(!RTC)return; const on=RTC.toggleMic(); const b=document.getElementById('rtcMic'); if(b)b.style.opacity=on?'1':'.5'; toast(on?'Microphone on':'Microphone muted'); }
+function rtcCam(){ if(!RTC)return; const on=RTC.toggleCam(); const b=document.getElementById('rtcCam'); if(b)b.style.opacity=on?'1':'.5'; toast(on?'Camera on':'Camera off'); }
+function rtcHang(){ if(RTC){ RTC.hangup(); RTC=null; } VISIT=null; back(); toast('Call ended. Visit summary saved to your record.'); }
+
+/* ---- Prescriptions ---- */
+SCREENS.rx = { title:'Prescriptions', body(){
+  return `<div style="margin-top:8px"></div>
+  ${DATA.prescriptions.map(r=>`
+    <div class="card" style="margin-bottom:12px">
+      <div class="row">
+        <div class="avatar sm soft">${svg(I.pill,20)}</div>
+        <div class="grow"><div class="k">${r.drug}</div><div class="muted" style="font-size:.82rem">${r.sig}</div></div>
+        <span class="pill ${r.status==='Active'?'green':'grey'}">${r.status}</span>
+      </div>
+      ${r.refill?`<button class="btn btn-soft btn-block tap" style="margin-top:12px" onclick="requestRefill('${r.id}')">${svg(I.refresh,18)}Request refill</button>`:''}
+    </div>`).join('')}
+  <div style="height:8px"></div>`;
+}};
+async function requestRefill(id){
+  try{ const d=await api('/api/prescriptions/'+id+'/refill',{method:'POST'}); DATA.deliveries.unshift(d); toast('Refill requested. The pharmacy will confirm shortly.'); go('delivery'); }
+  catch(e){ toast(e.message); }
+}
+
+/* ---- Delivery ---- */
+SCREENS.delivery = { title:'Medicine delivery', body(){
+  if(!DATA.deliveries.length) return emptyState('truck','No active deliveries','Request a refill and we will bring it to you.');
+  const steps=['Preparing','Dispatched','On the way','Delivered'];
+  return `<div style="margin-top:8px"></div>` + DATA.deliveries.map(d=>`
+    <div class="card" style="margin-bottom:14px">
+      <div class="row between" style="margin-bottom:16px"><div class="k">${d.drug}</div><span class="pill ${d.stage>=3?'green':'gold'}">${steps[d.stage]}</span></div>
+      <div class="tl">
+        ${steps.map((s,i)=>`
+          <div class="step">
+            <div class="rail">
+              <div class="dot ${i<d.stage?'done':i===d.stage?'now':''}">${i<d.stage?svg(I.check,14):i+1}</div>
+              ${i<steps.length-1?`<div class="line ${i<d.stage?'done':''}"></div>`:''}
+            </div>
+            <div class="body"><div class="t">${s}</div><div class="s">${i<d.stage?'Done':i===d.stage?'In progress':'Waiting'}</div></div>
+          </div>`).join('')}
+      </div>
+      ${d.stage<3?`<button class="btn btn-ghost btn-block tap" style="margin-top:14px" onclick="advance('${d.id}')">Advance status (demo)</button>`:''}
+    </div>`).join('');
+}};
+async function advance(id){ try{ const d=await api('/api/deliveries/'+id+'/advance',{method:'POST'}); const i=DATA.deliveries.findIndex(x=>x.id===id); if(i>=0) DATA.deliveries[i]=d; render(); }catch(e){ toast(e.message); } }
+
+/* ---- Providers ---- */
+SCREENS.providers = { title:'Find a hospital', body(){
+  return `<div style="margin-top:8px"></div>
+  <div class="searchbar">${svg(I.hospital,20)}<input id="provSearch" placeholder="Search hospitals, pharmacies..." oninput="filterProv()"></div>
+  <div class="row" style="gap:8px;margin-bottom:6px;overflow-x:auto;padding-bottom:2px" id="provFilters">
+    ${['All','Hospital','Pharmacy','Laboratory','Clinic'].map((f,i)=>`<button class="pill ${i===0?'teal':'grey'}" style="flex:none;padding:8px 14px" onclick="setProvFilter('${f}',this)">${f}</button>`).join('')}
+  </div>
+  <div id="provList">${provRows(DATA.providers)}</div>`;
+}, after(){ window._provFilter='All'; } };
+function provRows(list){
+  if(!list.length) return emptyState('pin','Nothing nearby','Try a different search or filter.');
+  return `<div class="menu-card">`+list.map(p=>`
+    <div class="lrow">
+      <div class="ic">${svg(p.kind==='Pharmacy'?I.pill:p.kind==='Laboratory'?I.flask:I.hospital,20)}</div>
+      <div class="grow"><div class="t">${p.name}</div><div class="s">${p.kind} \u00b7 ${p.area} \u00b7 ${p.km} km</div></div>
+      ${p.covered?`<span class="pill green">Covered</span>`:`<span class="pill grey">Cash</span>`}
+    </div>`).join('')+`</div>`;
+}
+function setProvFilter(f,el){ window._provFilter=f; [...el.parentElement.children].forEach(c=>c.className='pill grey'); el.className='pill teal'; el.style.flex='none'; el.style.padding='8px 14px'; filterProv(); }
+function filterProv(){
+  const q=($('provSearch').value||'').toLowerCase(); const f=window._provFilter||'All';
+  const list=DATA.providers.filter(p=>(f==='All'||p.kind===f)&&(!q||p.name.toLowerCase().includes(q)||p.area.toLowerCase().includes(q)));
+  $('provList').innerHTML=provRows(list);
+}
+
+/* ---- COVER ---- */
+SCREENS.cover = { body(){
+  const b=DATA.benefits, totalUsed=b.reduce((a,x)=>a+x.used,0), totalLimit=b.reduce((a,x)=>a+x.limit,0);
+  return `<div style="margin-top:8px"></div>
+  ${hospitalCardHTML()}
+  <div class="idwrap"><div class="idcard" id="idcard" onclick="flipCard()">
+    <div class="idface idfront">
+      <div class="guilloche"></div>
+      <div class="top"><div class="brand">${svg('M8 26 h6 l3 -8 l4 15 l3 -10 l2 2 h5',20)} MediCore</div><div class="plan">${ME.tier}</div></div>
+      <div class="who"><div class="nm">${ME.first} ${ME.last}</div><div class="no">${ME.member}</div></div>
+      <div class="foot"><div class="meta"><b>${ME.plan}</b><br>Valid at all partner hospitals</div><div class="qr">${qrSVG(ME.member)}</div></div>
+    </div>
+    <div class="idface idback">
+      <div class="magstripe"></div>
+      <div class="bcontent">
+        <div class="eyebrow" style="color:#8FD0D2">Benefit balance</div>
+        <div style="margin:10px 0 6px">
+          <div class="balrow"><span class="l">Used this year</span><span class="v mono">${ngn(totalUsed)}</span></div>
+          <div class="track" style="background:rgba(255,255,255,.12)"><div style="width:${Math.round(totalUsed/totalLimit*100)}%"></div></div>
+          <div class="balrow" style="margin-top:8px"><span class="l">Remaining</span><span class="v mono" style="color:var(--gold)">${ngn(totalLimit-totalUsed)}</span></div>
+        </div>
+        <div style="font-size:.72rem;color:#7FA6A8;margin-top:auto">Record synced \u00b7 ${ME.hn}</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="flip-hint">${svg(I.refresh,15)} Tap the card to see your balance</div>
+
+  <div class="section-h"><h2>Benefits & limits</h2></div>
+  <div class="card">
+    ${b.map(x=>{const pct=Math.round(x.used/x.limit*100); const cl=pct>=85?'low':pct>=60?'warn':'';return `
+      <div class="meter"><div class="top"><span class="name">${x.name}</span><span class="amt">${ngn(x.used)} / ${ngn(x.limit)}</span></div>
+      <div class="track"><div class="${cl}" style="width:${pct}%"></div></div></div>`;}).join('')}
+  </div>
+
+  <div class="section-h"><h2>Approvals</h2></div>
+  <div class="menu-card">
+    ${DATA.authorizations.map(a=>`<div class="lrow"><div class="ic ${a.status==='Approved'?'green':'gold'}">${svg(a.status==='Approved'?I.check:I.shield,20)}</div>
+      <div class="grow"><div class="t">${a.what}</div><div class="s">${a.where} \u00b7 ${a.when}</div></div>
+      <span class="pill ${a.status==='Approved'?'green':'gold'}">${a.status}</span></div>`).join('')}
+  </div>
+
+  <div class="section-h"><h2>Claims</h2><span class="more" onclick="go('claims')">See all</span></div>
+  <div class="menu-card">
+    ${DATA.claims.slice(0,2).map(c=>claimRow(c)).join('')}
+  </div>
+
+  ${DATA.bills.length?`<div class="section-h"><h2>To pay</h2></div>
+  <div class="card"><div class="row between"><div><div class="k">${DATA.bills[0].what}</div><div class="muted" style="font-size:.82rem">Your share after cover</div></div><div class="k mono">${ngn(DATA.bills[0].amount)}</div></div>
+  <button class="btn btn-primary btn-block tap" style="margin-top:14px" onclick="openPay(${DATA.bills[0].amount})">Pay ${ngn(DATA.bills[0].amount)}</button></div>`:''}
+  <div style="height:8px"></div>`;
+}};
+function claimRow(c){
+  const map={Paid:'green', Processing:'gold', Query:'coral'};
+  return `<div class="lrow"><div class="ic ${map[c.status]}">${svg(I.bill,20)}</div>
+    <div class="grow"><div class="t">${c.what}</div><div class="s">${c.when}${c.note?' \u00b7 '+c.note:''}</div></div>
+    <div class="col" style="align-items:flex-end;gap:4px"><span class="k mono" style="font-size:.86rem">${ngn(c.amount)}</span><span class="pill ${map[c.status]}" style="padding:2px 8px">${c.status}</span></div></div>`;
+}
+SCREENS.claims = { title:'Claims', body(){
+  return `<div style="margin-top:8px"></div><div class="menu-card">${DATA.claims.map(c=>claimRow(c)).join('')}</div>
+  <div class="card flat" style="margin-top:14px"><div class="row"><div class="lrow" style="padding:0;border:none"><div class="ic gold">${svg(I.shield,20)}</div></div><div class="grow" style="font-size:.84rem">A claim marked <b>Query</b> just needs one detail fixed. Your hospital handles it, you do not have to chase the HMO.</div></div></div>`;
+}};
+
+/* ---- flip / pay ---- */
+function flipCard(){ $('idcard').classList.toggle('flip'); }
+function openPay(amt){
+  openSheet(`<div class="grab"></div><h3>Pay ${ngn(amt)}</h3><p class="muted" style="font-size:.86rem;margin:0 0 8px">Choose how you would like to pay.</p>
+    ${['Card','Bank transfer / USSD','Mobile money'].map(m=>`<button class="btn btn-ghost btn-block tap" style="margin-top:8px;justify-content:flex-start" onclick="confirmPay(${amt},'${m}')">${m}</button>`).join('')}`);
+}
+async function confirmPay(amt,method){ closeSheet(); try{ const bill=DATA.bills[0]; const r=await api('/api/bills/'+bill.id+'/pay',{method:'POST',body:{method}}); if(r.authorization_url){ toast('Opening secure payment...'); } await loadBundle(); toast('Payment received via '+method+'. Receipt saved.'); render(); }catch(e){ toast(e.message); } }
+
+/* ---- RECORDS ---- */
+let recTab='overview';
+SCREENS.records = { body(){ return recordsBody(); }, after(){ } };
+function recordsBody(){
+  return `<div style="margin-top:6px"></div>
+  <div class="seg">
+    ${['overview','results','visits','meds'].map(t=>`<button class="${recTab===t?'on':''}" onclick="recTab='${t}';render()">${({overview:'Overview',results:'Results',visits:'Visits',meds:'Meds'})[t]}</button>`).join('')}
+  </div>
+  <div style="margin-top:14px">${recPane()}</div><div style="height:8px"></div>`;
+}
+function recPane(){
+  if(recTab==='overview'){
+    return `${ME.allergies.length?`<div class="card" style="border:1px solid var(--coral-soft);margin-bottom:14px"><div class="row"><div class="lrow" style="padding:0;border:none"><div class="ic coral">${svg(I.shield,20)}</div></div><div class="grow"><div class="eyebrow" style="color:var(--coral)">ALLERGY</div><div class="k" style="margin-top:2px">${ME.allergies.join(', ')}</div></div></div></div>`:''}
+    <div class="card" style="margin-bottom:14px"><div class="eyebrow">CONDITIONS</div>
+      ${ME.conditions.map(c=>`<div class="lrow"><div class="grow"><div class="t">${c.name}</div><div class="s">Since ${c.since}</div></div><span class="pill teal mono">${c.code}</span></div>`).join('')}
+    </div>
+    ${wearablesCard()}
+    <div class="card"><div class="eyebrow">ABOUT YOU</div>
+      <div class="row between" style="margin-top:10px"><span class="muted" style="font-size:.86rem">Age</span><span class="k">${new Date().getFullYear()-1991}</span></div>
+      <div class="row between" style="margin-top:8px"><span class="muted" style="font-size:.86rem">Blood group</span><span class="k">${ME.bg}</span></div>
+      <div class="row between" style="margin-top:8px"><span class="muted" style="font-size:.86rem">Hospital number</span><span class="k mono">${ME.hn}</span></div>
+    </div>`;
+  }
+  if(recTab==='results'){
+    return `<div class="menu-card">${DATA.results.map(r=>`
+      <div style="padding:14px 0;border-bottom:1px solid var(--line)">
+        <div class="row between"><div class="k">${r.test}</div><span class="pill ${r.flag==='normal'?'green':'coral'}">${r.flag==='normal'?'Normal':r.flag}</span></div>
+        <div class="row between" style="margin-top:6px"><span class="mono" style="font-size:1.1rem;font-weight:700">${r.value} <span class="faint" style="font-size:.8rem">${r.unit}</span></span><span class="faint" style="font-size:.76rem">${r.when}</span></div>
+        ${r.low!=null?rangeMini(r):''}
+      </div>`).join('')}</div>`;
+  }
+  if(recTab==='visits'){
+    return `<div class="menu-card">${DATA.visits.map(v=>`<div class="lrow"><div class="ic">${svg(I.file,20)}</div><div class="grow"><div class="t">${v.reason}</div><div class="s">${v.doctor} \u00b7 ${v.when}</div></div></div>`).join('')}</div>`;
+  }
+  return `<div class="menu-card">${DATA.prescriptions.map(r=>`<div class="lrow"><div class="ic">${svg(I.pill,20)}</div><div class="grow"><div class="t">${r.drug}</div><div class="s">${r.sig}</div></div><span class="pill ${r.status==='Active'?'green':'grey'}">${r.status}</span></div>`).join('')}</div>`;
+}
+function timeAgo(ts){ const m=Math.round((Date.now()-ts)/60000); if(m<1)return 'just now'; if(m<60)return m+'m ago'; const h=Math.round(m/60); if(h<24)return h+'h ago'; return Math.round(h/24)+'d ago'; }
+function wearablesCard(){
+  const w = DATA.wearables||[];
+  const latest = {};
+  w.forEach(x=>{ if(!latest[x.type] || x.at>latest[x.type].at) latest[x.type]=x; });
+  const rows = Object.values(latest).sort((a,b)=>b.at-a.at);
+  return `<div class="card" style="margin-bottom:14px">
+    <div class="row between"><div class="eyebrow">FROM YOUR DEVICES</div><span class="pill grey" style="font-size:.66rem">Demo device</span></div>
+    ${rows.length? rows.map(x=>`
+      <div class="row between" style="margin-top:12px">
+        <span class="row" style="gap:9px"><span class="ic soft" style="width:30px;height:30px">${svg(I.heart,17)}</span><span class="muted" style="font-size:.9rem">${x.type}</span></span>
+        <span style="text-align:right"><span class="k mono">${x.value}</span> <span class="faint" style="font-size:.78rem">${x.unit}</span><div class="faint" style="font-size:.68rem">${timeAgo(x.at)}</div></span>
+      </div>`).join('') : `<div class="muted" style="font-size:.86rem;margin-top:10px">No device readings yet.</div>`}
+    <button class="btn btn-ghost btn-block tap" style="margin-top:14px" onclick="syncDevice()">${svg(I.refresh,18)} Sync a reading</button>
+  </div>`;
+}
+async function syncDevice(){
+  try{
+    const base=70, v=base+Math.floor(Math.random()*14)-6;
+    await api('/api/wearables',{method:'POST',body:{type:'Heart rate',value:v,unit:'bpm'}});
+    await loadBundle(); toast('Reading synced from device'); render();
+  }catch(e){ toast(e.message); }
+}
+function rangeMini(r){
+  const span=(r.ch-r.cl)||1; const n=parseFloat(r.value); const pos=Math.max(2,Math.min(98,((n-r.cl)/span)*100));
+  const crit=n<=r.cl||n>=r.ch;
+  return `<div class="range-mini"><i class="${crit?'crit':''}" style="left:${pos}%"></i></div>
+  <div class="row between" style="margin-top:5px"><span class="faint" style="font-size:.68rem">Normal ${r.low}\u2013${r.high} ${r.unit}</span></div>`;
+}
+
+/* ---- CHAT ---- */
+let THREADS=[], CURT=null, pollTimer=null, hbTimer=null;
+function startHeartbeat(){ if(hbTimer) return; const beat=()=>api('/api/presence/ping',{method:'POST',body:{}}).catch(()=>{}); beat(); hbTimer=setInterval(beat, 15000); }
+async function loadThreads(){ try{ THREADS=await api('/api/threads'); }catch(e){ THREADS=[]; } }
+SCREENS.chat = { body(){
+  return `<div style="margin-top:6px"></div>
+  <button class="btn btn-primary btn-block tap" style="margin-bottom:12px" onclick="newChat()">${svg('M12 5v14M5 12h14',18)} New message</button>
+  <div id="threadList"><div class="muted" style="font-size:.85rem;padding:20px 0;text-align:center">Loading conversations...</div></div>`;
+}, after(){ startHeartbeat(); (async()=>{ await loadThreads(); const el=$('threadList'); if(el) el.innerHTML = THREADS.length? THREADS.map(threadRow).join('') : emptyState('chat','No conversations yet','Start a message with one of your doctors.'); })(); } };
+function threadRow(t){ const initials=(t.doctorName||'Dr').replace('Dr. ','').split(' ').map(x=>x[0]).join('');
+  return `<div class="card tap" style="margin-bottom:10px" onclick="openThread('${t.id}')"><div class="row">
+    <div class="avatar sm soft" style="position:relative">${initials}<span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;border:2px solid var(--surface);background:${t.doctorOnline?'var(--green)':'var(--faint)'}"></span></div>
+    <div class="grow"><div class="k" style="font-size:.92rem">${t.doctorName||'Doctor'}</div><div class="faint" style="font-size:.74rem">${t.hospitalName||''}</div><div class="muted" style="font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px">${t.lastFrom==='patient'?'You: ':''}${t.last||'No messages yet'}</div></div>
+    ${t.doctorOnline?'<span class="pill green" style="align-self:flex-start">Online</span>':''}
+  </div></div>`;
+}
+function openThread(id){ CURT=id; go('thread', id); }
+SCREENS.thread = { title:'Conversation', body(id){
+  return `<div id="threadHead" style="margin-top:4px"></div>
+  <div class="chat" id="chatBox"><div class="muted" style="font-size:.85rem">Loading...</div></div>
+  <div class="composer"><input id="msgInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendThreadMsg()"><button class="send tap" onclick="sendThreadMsg()">${svg('M22 2 11 13M22 2l-7 20-4-9-9-4z',20)}</button></div>`;
+}, after(id){ CURT=id; startHeartbeat(); loadThread(id,true); startThreadPoll(); } };
+async function loadThread(id, scroll){
+  try{ const t=await api('/api/threads/'+id);
+    const head=$('threadHead'); if(head) head.innerHTML=`<div class="card flat" style="margin-bottom:8px;padding:10px 14px"><div class="row"><div class="avatar sm soft">${(t.doctorName||'Dr').replace('Dr. ','').split(' ').map(x=>x[0]).join('')}</div><div class="grow"><div class="k" style="font-size:.9rem">${t.doctorName||'Doctor'}</div><div class="faint" style="font-size:.74rem">${t.hospitalName||''}</div></div><span class="pill ${t.doctorOnline?'green':'grey'}">${t.doctorOnline?'Online':'Offline'}</span></div></div>`;
+    renderMessages(t.messages, scroll);
+  }catch(e){ const b=$('chatBox'); if(b) b.innerHTML=`<div class="muted">${e.message}</div>`; }
+}
+function renderMessages(msgs, scroll){
+  const b=$('chatBox'); if(!b) return;
+  const sig=String(msgs.length)+':'+((msgs[msgs.length-1]||{}).at||0);
+  if(b.dataset.sig===sig) return;
+  b.innerHTML = msgs.map(m=> m.from==='system'
+    ? `<div class="faint" style="text-align:center;font-size:.76rem;margin:8px 4px">${m.text}</div>`
+    : `<div class="bub ${m.from==='patient'?'me':'them'}">${m.text}<div class="tm">${m.from==='doctor'?(m.who+' \u00b7 '):''}${timeAgo(m.at)}</div></div>`).join('');
+  b.dataset.sig=sig; if(scroll!==false) b.scrollTop=b.scrollHeight;
+}
+function timeAgo(at){ if(!at) return ''; const s=(Date.now()-at)/1000; if(s<60)return 'now'; if(s<3600)return Math.floor(s/60)+'m'; if(s<86400)return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d'; }
+function startThreadPoll(){ stopThreadPoll(); pollTimer=setInterval(()=>{ const cur=state.stack[state.stack.length-1]||{}; if(CURT && cur.screen==='thread'){ loadThread(CURT,false); } else { stopThreadPoll(); } }, 3500); }
+function stopThreadPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+async function sendThreadMsg(){
+  const el=$('msgInput'); const t=(el.value||'').trim(); if(!t||!CURT) return; el.value='';
+  try{ const r=await api('/api/threads/'+CURT+'/message',{method:'POST',body:{text:t}}); renderMessages(r.messages,true); }
+  catch(e){ toast(e.message); }
+}
+async function newChat(){
+  let list=[]; try{ list=await api('/api/doctors'); }catch(e){}
+  if(!list.length){ toast('No doctors available to message'); return; }
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.05rem;margin-bottom:10px">Message a doctor</div>
+    <div class="menu-card">`+list.map(d=>`<div class="lrow tap" onclick="startChat('${d.id}')"><div class="avatar sm soft" style="position:relative">${d.name.replace('Dr. ','').split(' ').map(x=>x[0]).join('')}<span style="position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--surface);background:${d.online?'var(--green)':'var(--faint)'}"></span></div><div class="grow"><div class="t">${d.name}</div><div class="s">${d.specialty} \u00b7 ${d.hospitalName||''}</div></div>${svg('M9 6l6 6-6 6',18)}</div>`).join('')+`</div>`);
+}
+async function startChat(doctorId){ closeSheet();
+  try{ const r=await api('/api/threads/start',{method:'POST',body:{doctorId}}); await loadThreads(); openThread(r.id); }
+  catch(e){ toast(e.message); }
+}
+
+/* ---- profile sheet ---- */
+function openProfile(){
+  openSheet(`<div class="grab"></div>
+    <div class="row" style="margin-bottom:16px"><div class="avatar lg soft">${ME.first[0]}${ME.last[0]}</div><div><div style="font-weight:700;font-size:1.1rem">${ME.first} ${ME.last}</div><div class="muted" style="font-size:.84rem">${ME.plan} \u00b7 ${ME.member}</div></div></div>
+    <button class="btn btn-ghost btn-block tap" style="justify-content:space-between;margin-bottom:8px" onclick="toggleTheme()"><span class="row" style="gap:10px">${svg(I.moon,20)} Dark mode</span><span class="pill ${state.theme==='dark'?'green':'grey'}">${state.theme==='dark'?'On':'Off'}</span></button>
+    <button class="btn btn-ghost btn-block tap" style="justify-content:flex-start;gap:10px;margin-bottom:8px" onclick="closeSheet();toast('Notification settings saved')">${svg(I.bell,20)} Notifications</button>
+    <button class="btn btn-ghost btn-block tap" style="justify-content:space-between;margin-bottom:8px" onclick="openLang()"><span class="row" style="gap:10px">${svg(I.chat,20)} ${t('Language')}</span><span class="pill grey">${(LANGS.find(l=>l.code===LANG)||{}).name}</span></button>
+    <button class="btn btn-block tap" style="justify-content:flex-start;gap:10px;background:var(--coral-soft);color:var(--coral)" onclick="logout()">${svg(I.logout,20)} ${t('Log out')}</button>`);
+}
+
+/* ---- booking sheet ---- */
+let bookType='in-person';
+function openBook(){
+  bookType='in-person';
+  openSheet(`<div class="grab"></div><h3>Book a visit</h3><p class="muted" style="font-size:.86rem;margin:0">We will find the next open slot.</p>
+    <div class="field"><label>Type of visit</label><div class="opt-row" id="bookType">
+      <button class="opt on" onclick="pickType('in-person',this)">In person</button>
+      <button class="opt" onclick="pickType('video',this)">Video</button></div></div>
+    <div class="field"><label>Reason</label><select class="inp" id="bookReason"><option>General consultation</option><option>Blood pressure review</option><option>Antenatal</option><option>Follow-up</option></select></div>
+    <div class="field"><label>Preferred day</label><select class="inp" id="bookDay"><option>Tomorrow</option><option>In 2 days</option><option>This weekend</option><option>Next week</option></select></div>
+    <button class="btn btn-primary btn-block btn-lg tap" style="margin-top:6px" onclick="confirmBook()">Confirm booking</button>`);
+}
+function pickType(t,el){ bookType=t; [...el.parentElement.children].forEach(c=>c.className='opt'); el.className='opt on'; }
+function confirmBook(){
+  const reason=$('bookReason').value, day=$('bookDay').value;
+  closeSheet();
+  api('/api/appointments',{method:'POST',body:{dept:reason,type:bookType,day}}).then(a=>{ DATA.appointments.push(a); toast('Visit booked. A reminder is set for you.'); state.stack=[]; state.tab='care'; go('appts'); }).catch(e=>toast(e.message));
+}
+
+/* ---- DOCTOR MARKETPLACE ---- */
+const SPECIALTIES=['All','Cardiology','Paediatrics','Dermatology','Family Medicine','General Physician','Obstetrics & Gynaecology'];
+SCREENS.doctors={ title:'Find a doctor', body(){
+  return `<div style="margin-top:8px"></div>
+  <div class="searchbar">${svg(I.care,20)}<input id="docSearch" placeholder="Search name or specialty..." oninput="filterDoctors()"></div>
+  <div class="row" style="gap:8px;margin-bottom:8px;overflow-x:auto;padding-bottom:2px" id="specFilters">
+    ${SPECIALTIES.map((f,i)=>`<button class="pill ${i===0?'teal':'grey'}" style="flex:none;padding:8px 14px" onclick="setSpec('${f}',this)">${f}</button>`).join('')}
+  </div>
+  <div id="docList"><div class="muted" style="font-size:.85rem;padding:24px 0;text-align:center">Loading doctors...</div></div>`;
+}, after(){ window._spec='All'; loadDoctors(); } };
+async function loadDoctors(){
+  const q=($('docSearch')&&$('docSearch').value||'').trim(); const spec=window._spec||'All';
+  try{ const list=await api('/api/doctors?q='+encodeURIComponent(q)+'&specialty='+encodeURIComponent(spec)); window._docs=list;
+    $('docList').innerHTML = list.length? list.map(docCard).join('') : emptyState('care','No doctors found','Try another name, specialty, or filter.');
+  }catch(e){ if($('docList')) $('docList').innerHTML=`<div class="muted" style="padding:20px 0">${e.message}</div>`; }
+}
+function filterDoctors(){ loadDoctors(); }
+function setSpec(f,el){ window._spec=f; [...el.parentElement.children].forEach(c=>{c.className='pill grey';c.style.flex='none';c.style.padding='8px 14px';}); el.className='pill teal'; el.style.flex='none'; el.style.padding='8px 14px'; loadDoctors(); }
+function docCard(d){
+  const initials=d.name.replace('Dr. ','').split(' ').map(x=>x[0]).join('');
+  return `<div class="card tap" style="margin-bottom:12px" onclick="openDocProfile('${d.id}')"><div class="row">
+    <div class="avatar lg soft">${initials}</div>
+    <div class="grow"><div class="k">${d.name}</div><div class="muted" style="font-size:.82rem">${d.specialty} \u00b7 ${d.area}</div>
+      <div class="row" style="gap:6px;margin-top:7px"><span class="pill gold" style="padding:3px 9px">\u2605 ${d.rating}</span>${d.available?'<span class="pill green" style="padding:3px 9px">Available</span>':'<span class="pill grey" style="padding:3px 9px">Busy</span>'}</div>
+    </div>
+    <div class="col" style="align-items:flex-end"><div class="k mono" style="font-size:.9rem">${ngn(d.fee)}</div><div class="faint" style="font-size:.72rem">per visit</div></div>
+  </div></div>`;
+}
+function openDocProfile(id){
+  const d=(window._docs||[]).find(x=>x.id===id); if(!d) return;
+  const initials=d.name.replace('Dr. ','').split(' ').map(x=>x[0]).join('');
+  openSheet(`<div class="grab"></div>
+    <div class="row" style="margin-bottom:14px"><div class="avatar lg gold">${initials}</div><div class="grow"><div style="font-weight:700;font-size:1.15rem">${d.name}</div><div class="muted" style="font-size:.85rem">${d.specialty} \u00b7 ${d.facility}</div>
+      <div class="row" style="gap:6px;margin-top:6px"><span class="pill gold" style="padding:3px 9px">\u2605 ${d.rating}</span><span class="pill grey" style="padding:3px 9px">${d.reviews} reviews</span></div></div></div>
+    <p class="muted" style="font-size:.88rem;margin:0 0 12px">${d.bio||''}</p>
+    <div class="row between" style="margin-bottom:6px"><span class="muted" style="font-size:.85rem">Languages</span><span class="k" style="font-size:.85rem">${(d.languages||[]).join(', ')}</span></div>
+    <div class="row between" style="margin-bottom:14px"><span class="muted" style="font-size:.85rem">Consultation fee</span><span class="k mono">${ngn(d.fee)}</span></div>
+    <div class="field"><label>Visit type</label><div class="opt-row" id="mType">
+      <button class="opt on" onclick="pickMType('in-person',this)">In person</button>
+      <button class="opt" onclick="pickMType('video',this)">Video</button></div></div>
+    <div class="field"><label>Time</label><div class="opt-row" id="mSlot">
+      ${(d.slots||['10:00']).map((t,i)=>`<button class="opt ${i===0?'on':''}" onclick="pickSlot('${t}',this)">${t}</button>`).join('')}</div></div>
+    <button class="btn btn-primary btn-block btn-lg tap" style="margin-top:6px" onclick="bookDoctor('${d.id}')">Book ${d.name.split(' ').slice(-1)[0]}</button>`);
+  window._mType='in-person'; window._mSlot=(d.slots||['10:00'])[0];
+}
+function pickMType(t,el){ window._mType=t; [...el.parentElement.children].forEach(c=>c.className='opt'); el.className='opt on'; }
+function pickSlot(t,el){ window._mSlot=t; [...el.parentElement.children].forEach(c=>c.className='opt'); el.className='opt on'; }
+async function bookDoctor(id){
+  closeSheet();
+  try{ const a=await api('/api/marketplace/book',{method:'POST',body:{doctorId:id,type:window._mType,day:'Tomorrow',time:window._mSlot}});
+    DATA.appointments.push(a); toast('Booked '+a.doctor+'. A reminder is set for you.'); state.stack=[]; state.tab='care'; go('appts');
+  }catch(e){ toast(e.message); }
+}
+
+/* ---- primitives ---- */
+function emptyState(ic,t,s){ return `<div class="empty"><div class="ic">${svg(I[ic],28)}</div><div class="t">${t}</div><div style="font-size:.88rem">${s}</div></div>`; }
+function openSheet(html){ $('sheet').innerHTML=html; $('sheet').classList.add('on'); $('scrim').classList.add('on'); }
+function closeSheet(){ $('sheet').classList.remove('on'); $('scrim').classList.remove('on'); }
+function toast(msg){ const w=$('toastWrap'); const t=document.createElement('div'); t.className='toast'; t.innerHTML=`<span class="ic">${svg(I.check,17)}</span>${msg}`; w.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .3s, transform .3s'; t.style.opacity='0'; t.style.transform='translateY(10px)'; setTimeout(()=>t.remove(),300); }, 2600); }
+function toggleTheme(){ state.theme=state.theme==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',state.theme); document.querySelector('meta[name=theme-color]').setAttribute('content', state.theme==='dark'?'#081416':'#0C3237'); try{localStorage.setItem('mc-theme',state.theme);}catch(e){} closeSheet(); render(); }
+
+/* init theme from system / storage */
+(function(){ try{ const s=localStorage.getItem('mc-theme'); if(s){state.theme=s;} else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches){state.theme='dark';} }catch(e){} document.documentElement.setAttribute('data-theme',state.theme);
+  if(TOKEN){ enterApp().catch(()=>{ /* token invalid */ TOKEN=null; try{localStorage.removeItem('mc:token');}catch(e){} }); }
+})();
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
+</body>
+</html>

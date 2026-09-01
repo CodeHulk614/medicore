@@ -1,0 +1,31 @@
+{
+  "id": "/dispatch.html",
+  "name": "MediCore Dispatch",
+  "short_name": "MC Dispatch",
+  "start_url": "/dispatch.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#DF5039",
+  "icons": [
+    {
+      "src": "/icons/dispatch-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/dispatch-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/dispatch-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

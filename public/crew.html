@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0C2A2E"/>
+<title>MediCore Crew</title>
+<link rel="manifest" href="/crew.webmanifest"/>
+<style>
+:root{
+  --bg:#F4F7F7; --surface:#fff; --surface-2:#EDF3F3; --ink:#0C2A2E; --muted:#5E7678; --faint:#93A9AA; --line:#E4EBEB;
+  --teal:#15707A; --teal-soft:#E2F0F0; --gold:#E9B23C; --coral:#DF5039; --coral-soft:#FBE5E0; --green:#15A88A;
+  --shadow:0 6px 20px rgba(12,42,46,.08); --fb:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+[data-theme=dark]{ --bg:#0A1E21; --surface:#0F282C; --surface-2:#123034; --ink:#EAF3F2; --muted:#93AEB0; --faint:#5E7B7D; --line:rgba(255,255,255,.08); --teal:#3FB2BB; --teal-soft:rgba(63,178,187,.14); --coral:#F0785F; --coral-soft:rgba(240,120,95,.14); --green:#3FBFA0; }
+*{box-sizing:border-box} html,body{margin:0}
+body{ font-family:var(--fb); background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+.wrap{ max-width:520px; margin:0 auto; min-height:100vh; padding:0 16px 40px; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; padding:18px 2px 12px; }
+.topbar .t{ font-size:1.3rem; font-weight:700; }
+.tb-btn{ width:38px; height:38px; border-radius:11px; border:none; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); }
+.card{ background:var(--surface); border-radius:16px; padding:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+.k{ font-weight:700; } .mini{ font-size:.82rem; color:var(--muted); } .muted{ color:var(--muted); }
+.pill{ font-size:.72rem; font-weight:700; padding:5px 11px; border-radius:999px; display:inline-block; }
+.btn{ border:none; border-radius:13px; padding:15px 16px; font-size:1rem; font-weight:700; width:100%; margin-bottom:10px; }
+.btn-primary{ background:var(--teal); color:#fff; } .btn-coral{ background:var(--coral); color:#fff; }
+.btn-gold{ background:var(--gold); color:#3a2b06; } .btn-line{ background:transparent; border:1.5px solid var(--line); color:var(--ink); }
+.btn-soft{ background:var(--teal-soft); color:var(--teal); }
+.field label{ display:block; font-size:.8rem; font-weight:600; color:var(--muted); margin:0 0 6px; }
+.field input,.field select{ width:100%; padding:13px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); font-size:1rem; margin-bottom:12px; outline:none; }
+.lock{ position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; z-index:50; }
+.lockcard{ width:min(420px,92vw); }
+.big{ font-size:1.5rem; font-weight:800; letter-spacing:-.01em; }
+.status-hero{ border-radius:16px; padding:18px; color:#fff; margin-bottom:14px; }
+.row{ display:flex; align-items:center; gap:12px; } .grow{ flex:1; } .between{ justify-content:space-between; }
+.dot{ width:10px; height:10px; border-radius:50%; display:inline-block; }
+.err{ color:var(--coral); font-size:.85rem; min-height:1.1em; margin-top:4px; }
+.seg{ display:flex; gap:8px; margin-bottom:12px; }
+svg.map{ width:100%; display:block; border-radius:12px; }
+.toastwrap{ position:fixed; left:0; right:0; bottom:22px; display:flex; flex-direction:column; align-items:center; gap:8px; z-index:60; pointer-events:none; }
+.toast{ background:var(--ink); color:#fff; padding:11px 16px; border-radius:999px; font-size:.9rem; box-shadow:var(--shadow); }
+</style></head>
+<body>
+<div class="lock" id="lock"><div class="lockcard card">
+  <div class="big" style="margin-bottom:4px">MediCore Crew</div>
+  <div class="mini" style="margin-bottom:16px">Ambulance mobile terminal</div>
+  <div class="field"><label>Email</label><input id="email" value="crew@demo.ng" autocomplete="username"/></div>
+  <div class="field"><label>Password</label><input id="password" type="password" value="demo1234" autocomplete="current-password"/></div>
+  <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">Sign in</button>
+  <div class="err" id="authErr"></div>
+</div></div>
+
+<div class="wrap" id="app" style="display:none">
+  <div class="topbar"><div class="t">Crew terminal</div>
+    <button class="tb-btn" onclick="toggleTheme()" title="Theme">◐</button></div>
+  <div id="view"></div>
+</div>
+<div class="toastwrap" id="toastWrap"></div>
+
+<script src="/mapkit.js"></script>
+<script src="/clockkit.js"></script>
+<script src="/refresh.js"></script>
+<script>
+const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} const q=new URLSearchParams(location.search).get('api'); if(q) return q; if(location.protocol.startsWith('http')) return location.origin; return 'http://localhost:4000'; })();
+const TKEY='mccrew:token'; let TOKEN=null; try{ TOKEN=localStorage.getItem(TKEY); }catch(e){}
+function $(id){ return document.getElementById(id); }
+async function api(path,opts){ opts=opts||{}; const h=Object.assign({'Content-Type':'application/json'},opts.headers||{}); if(TOKEN)h.Authorization='Bearer '+TOKEN; const r=await fetch(API+path,{method:opts.method||'GET',headers:h,body:opts.body?JSON.stringify(opts.body):undefined}); const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error||('Request failed ('+r.status+')')); return d; }
+function toast(m){ const w=$('toastWrap'); const t=document.createElement('div'); t.className='toast'; t.textContent=m; w.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(()=>t.remove(),300); },2200); }
+let theme='light'; function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentElement.setAttribute('data-theme',theme); try{localStorage.setItem('mcs-theme',theme);}catch(e){} }
+(function(){ try{ const s=localStorage.getItem('mcs-theme'); if(s){theme=s; document.documentElement.setAttribute('data-theme',theme);} }catch(e){} })();
+
+async function doLogin(){ const email=$('email').value.trim(), password=$('password').value; $('authErr').textContent=''; $('loginBtn').textContent='Signing in...';
+  try{ const r=await api('/api/auth/login',{method:'POST',body:{email,password}}); TOKEN=r.token; try{localStorage.setItem(TKEY,TOKEN);}catch(e){} enter(); }
+  catch(e){ $('authErr').textContent=e.message; $('loginBtn').textContent='Sign in'; } }
+function logout(){ TOKEN=null; try{localStorage.removeItem(TKEY);}catch(e){} location.reload(); }
+
+const UST={available:['#15A88A','Available'],dispatched:['#E9B23C','Dispatched'],enroute:['#E9B23C','En route'],onscene:['#DF5039','On scene'],transporting:['#DF5039','Transporting'],athospital:['#3FB2BB','At hospital'],clearing:['#93A9AA','Clearing'],returning:['#93A9AA','Returning to base']};
+function uc(s){ return (UST[s]||['#93A9AA','—']); }
+let ME={unit:null,case:null,fleet:[],hospitals:[]};
+
+async function enter(){ $('lock').style.display='none'; $('app').style.display='block'; await refresh(); startPoll(); }
+async function refresh(){ try{ ME=await api('/api/crew/me'); render(); }catch(e){ toast(e.message); } }
+function shapeOf(){ return ME.unit?(ME.unit.status+'|'+(ME.case?ME.case.id:'')):'nounit'; }
+let lastShape=''; let poll=null;
+function startPoll(){ if(poll)return; poll=setInterval(async()=>{ try{ ME=await api('/api/crew/me'); if(shapeOf()!==lastShape){ render(); } else { paintCrewMap(); const e=document.getElementById('etaLine'); if(e&&ME.unit&&ME.unit.eta!=null) e.textContent='ETA '+Math.max(1,Math.round(ME.unit.eta/60))+' min'; const cc=document.getElementById('crewChat'); if(cc){ const atB=cc.scrollHeight-cc.scrollTop-cc.clientHeight<40; mcMorph(cc,crewChatHTML(ME.chat||[])); if(atB)cc.scrollTop=cc.scrollHeight; } } }catch(e){} },2000); }
+
+function render(){
+  lastShape=shapeOf();
+  if(!ME.unit){ renderPick(); return; }
+  const u=ME.unit, c=ME.case, s=uc(u.status);
+  mcView(`
+  <div class="status-hero" style="background:${s[0]}">
+    <div class="row between"><div><div style="font-size:.78rem;opacity:.85;font-weight:700;letter-spacing:.08em;text-transform:uppercase">${u.name}</div>
+      <div class="big" style="color:#fff">${s[1]}</div></div>
+      <div style="text-align:right"><div style="font-size:.78rem;opacity:.85">${u.plate}</div><div style="font-size:.78rem;opacity:.85">${u.crew}</div></div></div>
+    <div id="etaLine" style="margin-top:8px;font-size:.9rem;opacity:.95">${u.eta!=null?'ETA '+Math.max(1,Math.round(u.eta/60))+' min':''}</div>
+  </div>
+  ${c?caseCard(c,u):`<div class="card"><div class="k">No active run</div><div class="mini" style="margin-top:4px">Standing by at ${u.hospital}. Dispatch will assign you.</div></div>`}
+  ${c?`<div class="card" style="padding:10px"><div id="crewMap" data-keep style="height:180px;border-radius:12px;overflow:hidden"></div></div>`:''}
+  ${c?`<div class="card"><div style="font-weight:700;margin-bottom:8px">Chat with the patient</div><div id="crewChat" style="max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:8px">${crewChatHTML(ME.chat||[])}</div>
+    <div class="row" style="gap:8px;margin-top:10px"><input id="crewMsg" placeholder="Message the patient…" style="flex:1;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)" onkeydown="if(event.key==='Enter')sendCrewMsg()"><button class="btn btn-primary tap" style="padding:11px 16px" onclick="sendCrewMsg()">Send</button></div></div>`:''}
+  ${actions(u,c)}
+  <button class="btn btn-line" style="margin-top:6px" onclick="clockOut()">Switch unit</button>
+  <button class="btn btn-line" onclick="logout()">Log out</button>`);
+  ensureCrewMap(); paintCrewMap();
+  const cc=document.getElementById('crewChat'); if(cc)cc.scrollTop=cc.scrollHeight;
+}
+function crewChatHTML(msgs){ if(!msgs||!msgs.length) return '<div class="mini" style="text-align:center;padding:8px">No messages yet.</div>'; return msgs.map(m=>{ const mine=m.from==='crew'; return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:80%"><div style="background:${mine?'var(--teal,#15707A)':'var(--surface-2,#EDF3F3)'};color:${mine?'#fff':'var(--ink)'};padding:8px 12px;border-radius:14px;font-size:.9rem">${(m.text||'').replace(/</g,'&lt;')}</div><div class="mini" style="font-size:.68rem;margin-top:2px;${mine?'text-align:right':''}">${mine?'You':(m.fromName||'Patient')} · ${new Date(m.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>`; }).join(''); }
+async function sendCrewMsg(){ const i=document.getElementById('crewMsg'); const text=(i.value||'').trim(); if(!text)return; i.value=''; try{ const r=await api('/api/crew/chat',{method:'POST',body:{text}}); ME.chat=r.chat; const c=document.getElementById('crewChat'); if(c){c.innerHTML=crewChatHTML(r.chat);c.scrollTop=c.scrollHeight;} }catch(e){ toast(e.message); } }
+let crewMapObj=null, crewMapEl=null;
+function ensureCrewMap(){ if(typeof MapKit==='undefined')return; const el=document.getElementById('crewMap'); if(!el){ crewMapEl=null; return; } if(crewMapEl!==el){ if(crewMapObj)crewMapObj.destroy(); crewMapObj=MapKit.create(el,{bounds:ME.bounds}); crewMapEl=el; } }
+function paintCrewMap(){ if(!crewMapObj||!ME.unit)return; const u=ME.unit; const showHosp=(u.status==='transporting'||u.status==='athospital'); crewMapObj.update({ units:[u], scene:MapKit.ridePos(u,ME.pickup), hospital:showHosp&&ME.hospitalPt?{lat:ME.hospitalPt.lat,lng:ME.hospitalPt.lng,name:(ME.hospitals&&ME.hospitals[0]?ME.hospitals[0].name:'Hospital')}:null, route:u.route, bounds:ME.bounds }); }
+function caseCard(c,u){ return `<div class="card"><div class="row between"><div class="k">${c.kind}</div><span class="pill" style="background:var(--coral-soft);color:var(--coral)">${c.priority||''}</span></div>
+  <div class="mini" style="margin-top:6px">📍 ${c.area}${c.name?' · '+c.name:''}${c.phone?' · '+c.phone:''}</div>
+  ${c.hospital?`<div class="mini" style="margin-top:4px">🏥 Receiving: ${c.hospital}</div>`:''}</div>`; }
+function actions(u,c){
+  const s=u.status; if(!c) return '';
+  const map={enroute:['onscene','On scene'],onscene:['__transport','Start transport'],transporting:['arrived','At hospital'],athospital:['clear','Clear run']};
+  const ov=map[s]; if(!ov) return '';
+  const onclick=ov[0]==='__transport'?'pickHospital()':`crew('${ov[0]}')`;
+  return `<div class="card" style="padding:12px"><div class="mini" style="margin-bottom:8px">Stages advance automatically from your GPS position. Use these only if the app is offline.</div>
+    <button class="btn btn-line" style="margin:0" onclick="${onclick}">Offline override: ${ov[1]}</button></div>`;
+}
+function renderPick(){
+  const avail=(ME.fleet||[]);
+  mcView(`<div class="card"><div class="k">Clock into a vehicle</div><div class="mini" style="margin-top:4px;margin-bottom:12px">Choose the ambulance you are crewing today.</div>
+  ${avail.map(u=>`<button class="btn btn-line" style="text-align:left" onclick="pick('${u.id}')"><div class="row between"><span>${u.name} · ${u.plate}</span><span class="dot" style="background:${uc(u.status)[0]}"></span></div><div class="mini" style="margin-top:4px">${u.type} · base ${u.hospital}</div></button>`).join('')}</div>
+  <button class="btn btn-line" onclick="logout()">Log out</button>`);
+}
+async function pick(id){ try{ await api('/api/crew/pick',{method:'POST',body:{responderId:id}}); await refresh(); toast('Clocked in'); }catch(e){ toast(e.message); } }
+async function clockOut(){ try{ await api('/api/crew/clockout',{method:'POST',body:{}}); }catch(e){} ME={unit:null}; await refresh(); }
+async function crew(action){ try{ await api('/api/crew/'+action,{method:'POST',body:{}}); await refresh(); toast('Status updated'); }catch(e){ toast(e.message); } }
+function pickHospital(){ const hs=ME.hospitals||[]; const box=document.createElement('div'); box.className='card';
+  box.innerHTML=`<div class="k" style="margin-bottom:10px">Receiving hospital</div>`+hs.map(h=>`<button class="btn btn-line" onclick="startTransport('${h.id}')">${h.name}</button>`).join('');
+  $('view').prepend(box); window.scrollTo(0,0); }
+async function startTransport(hid){ try{ await api('/api/crew/transport',{method:'POST',body:{hospitalId:hid}}); await refresh(); toast('Transport started, hospital alerted'); }catch(e){ toast(e.message); } }
+
+function miniMap(u,c){ const B={latMin:6.42,latMax:6.63,lngMin:3.31,lngMax:3.56}; const W=340,H=170,P=12;
+  const px=lng=>P+((lng-B.lngMin)/(B.lngMax-B.lngMin))*(W-2*P); const py=lat=>P+((B.latMax-lat)/(B.latMax-B.latMin))*(H-2*P);
+  const hosp=(ME.hospitals||[]);
+  const tgt=(u.status==='transporting')?null:c;
+  const route=`<line x1="${px(u.lng)}" y1="${py(u.lat)}" x2="${px(c.lng)}" y2="${py(c.lat)}" stroke="${uc(u.status)[0]}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.6"/>`;
+  const scene=`<circle cx="${px(c.lng)}" cy="${py(c.lat)}" r="5" fill="#DF5039"/>`;
+  const unit=`<circle cx="${px(u.lng)}" cy="${py(u.lat)}" r="7" fill="${uc(u.status)[0]}" stroke="#fff" stroke-width="1.5"/>`;
+  return `<div class="card" style="padding:10px"><svg class="map" viewBox="0 0 ${W} ${H}"><rect x="${P}" y="${P}" width="${W-2*P}" height="${H-2*P}" rx="10" fill="var(--surface-2)"/>${route}${scene}${unit}</svg></div>`;
+}
+
+if(TOKEN){ enter().catch(()=>{ TOKEN=null; try{localStorage.removeItem(TKEY);}catch(e){} $('lock').style.display='flex'; }); }
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script></body></html>

@@ -1,0 +1,31 @@
+{
+  "id": "/payer.html",
+  "name": "MediCore Payer",
+  "short_name": "MC Payer",
+  "start_url": "/payer.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#3FB2BB",
+  "icons": [
+    {
+      "src": "/icons/payer-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/payer-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/payer-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

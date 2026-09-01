@@ -1,0 +1,31 @@
+{
+  "id": "/index.html",
+  "name": "MediCore",
+  "short_name": "MediCore",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#0C3237",
+  "icons": [
+    {
+      "src": "/icons/patient-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/patient-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/patient-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

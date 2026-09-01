@@ -1,0 +1,31 @@
+{
+  "id": "/crew.html",
+  "name": "MediCore Crew",
+  "short_name": "MC Crew",
+  "start_url": "/crew.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#C7522A",
+  "icons": [
+    {
+      "src": "/icons/crew-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/crew-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/crew-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

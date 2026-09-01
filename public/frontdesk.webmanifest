@@ -1,0 +1,31 @@
+{
+  "id": "/frontdesk.html",
+  "name": "MediCore Front Office",
+  "short_name": "MC Front Desk",
+  "start_url": "/frontdesk.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#6D5AE0",
+  "icons": [
+    {
+      "src": "/icons/frontoffice-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/frontoffice-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/frontoffice-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

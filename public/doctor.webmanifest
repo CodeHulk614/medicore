@@ -1,0 +1,31 @@
+{
+  "id": "/doctor.html",
+  "name": "MediCore for Doctors",
+  "short_name": "MediCore Dr",
+  "start_url": "/doctor.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C3237",
+  "theme_color": "#227C8B",
+  "icons": [
+    {
+      "src": "/icons/doctor-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/doctor-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/doctor-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
