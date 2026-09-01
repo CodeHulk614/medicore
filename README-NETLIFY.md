@@ -1,54 +1,59 @@
-# MediCore — Netlify edition (all-on-Netlify, Postgres-backed)
+# MediCore — Netlify edition (all-on-Netlify)
 
-The 11 apps run as static PWAs on Netlify, and the whole API runs as one Netlify
-Function. Data lives in a free hosted **Postgres** (Neon or Supabase). This is the
-edition to deploy for a stable demo: writes use a row-lock so nothing gets clobbered
-by the apps' polling (this is what fixes the "clock-in won't stick / everything
-resets on refresh" problem).
+The 11 apps run as static PWAs on Netlify; the whole API runs as one Netlify Function.
+Data lives in a free hosted database. Pick MongoDB **or** Postgres by setting one env var:
 
-## Deploy in 4 steps
+- `MONGODB_URI`  → MongoDB (Atlas free M0)   ← set this to use Mongo
+- `DATABASE_URL` → Postgres (Neon/Supabase)  ← or this to use Postgres
+- neither        → local file store (for `npm start` only; not for Netlify)
 
-1. **Create a free Postgres** (pick one):
-   - **Neon** (neon.tech): New Project → copy the **pooled** connection string. It looks like
-     `postgresql://USER:PASS@ep-xxxx-pooler.REGION.aws.neon.tech/neondb?sslmode=require`.
-   - **Supabase** (supabase.com): New project → Project Settings → Database → Connection string →
-     **Connection pooling / Transaction** → copy it (ends with `?sslmode=require`).
+Priority is MONGODB_URI, then DATABASE_URL, then file. Writes are serialized with a lock
+so the apps' polling can never clobber a write (this is what makes clock-in stick).
 
-2. **Push this folder to GitHub** and import it on Netlify (Add new site → Import from Git).
-   Netlify reads `netlify.toml` automatically (publishes `public/`, bundles the function,
-   redirects `/api/*`).
+## Deploy with MongoDB (Atlas)
 
-3. **Add the database URL to Netlify**: Site configuration → Environment variables →
-   add `DATABASE_URL` = the connection string from step 1. Then **redeploy** (Deploys →
-   Trigger deploy) so the function picks it up.
+1. **Create a free cluster** at mongodb.com/atlas → M0 (free).
+2. **Database Access** → Add New Database User → username + password (remember them).
+3. **Network Access** → Add IP Address → **Allow access from anywhere (0.0.0.0/0)**.
+   Netlify Functions use changing IPs, so this is required or connections are refused.
+4. **Connect → Drivers** → copy the connection string, it looks like
+   `mongodb+srv://USER:PASS@cluster0.xxxx.mongodb.net/?retryWrites=true&w=majority`
+   Put your real password in place of `PASS`.
+5. Push this folder to GitHub and import it on Netlify (Add new site → Import from Git).
+6. Netlify → **Site configuration → Environment variables** → add `MONGODB_URI` = that string.
+   (Optional: `MONGODB_DB` to set the database name; default is `medicore`.)
+7. **Redeploy** (Deploys → Trigger deploy). Env vars only apply to a new build.
+8. Open the site. The function creates its collection and seeds the demo data on first use.
+   All logins are `demo1234`. In Atlas → Browse Collections you'll see database `medicore`,
+   collection `store`, with one document holding everything.
 
-4. Open your site. The function auto-creates its table and seeds the demo data on the
-   first request. All logins are `demo1234`.
+## Deploy with Postgres (Neon/Supabase) — alternative
 
-That's it. No schema to run — the function manages its own table (`medicore_store`).
+1. Create a free Postgres (Neon or Supabase). Copy the **pooled** connection string
+   (ends with `?sslmode=require`).
+2. Netlify → Environment variables → add `DATABASE_URL` = that string → Redeploy.
+   The function creates its table (`medicore_store`) and seeds on first use.
 
-## Why this is stable now
-- The entire database is one JSONB document. Every **write** runs inside a transaction
-  that takes a Postgres advisory lock first, so concurrent requests are serialized and
-  can't overwrite each other. **Reads never write**, so the apps' 2-second polling can no
-  longer erase a clock-in or any other change.
-- Verified against a real Postgres: clock-in sticks under concurrent polling, writes
-  persist, and two simultaneous writes both survive (no last-write-wins).
+## Why it's stable
+- The whole database is one document. Every **write** takes a lock first (a Mongo lock
+  document, or a Postgres advisory lock), so concurrent requests are serialized and can't
+  overwrite each other. **Reads never write**, so 2-second polling can't erase a clock-in.
+- Verified: clock-in sticks under concurrent polling, writes persist, and two simultaneous
+  writes both survive (no last-write-wins) — on both Mongo and Postgres.
 
-## Optional env vars (Netlify → Environment variables)
-- `JWT_SECRET` — set a strong secret for real use.
-- `ENFORCE_CLOCKIN=1` — server-side clock-in enforcement.
-- `TURN_URL`, `TURN_USER`, `TURN_PASS` — TURN server for video on strict mobile networks.
+## Still runs locally
+`npm install` then `npm start` → http://localhost:4000 (file store). The database is only
+used on Netlify, when `MONGODB_URI` or `DATABASE_URL` is set.
 
-## It still runs locally, unchanged
-`npm install` then `npm start` → http://localhost:4000 (file-based store, exactly like the
-original). Postgres is only used on Netlify, when `DATABASE_URL` is set.
+## Optional env vars
+`JWT_SECRET` (set a strong secret), `ENFORCE_CLOCKIN=1`, and `TURN_URL`/`TURN_USER`/`TURN_PASS`
+(video on strict mobile networks).
 
 ## Honest notes
-- One JSONB document with serialized writes is ideal for a demo/pilot and completely
-  consistent. It is not high-throughput: writes run one at a time. For production scale,
-  the `store.js` seam is where you'd move to per-table Postgres.
-- If you deploy **without** `DATABASE_URL`, the function falls back to a per-instance file
-  store that does **not** persist across Netlify cold starts. Always set `DATABASE_URL` on
-  Netlify.
-- Movement (ambulances/riders) advances when a screen loads/polls (no background clock).
+- One document with serialized writes is fully consistent and ideal for a demo/pilot; writes
+  run one at a time, so it's not high-throughput. For production scale, move `store.js` to
+  per-collection/table storage.
+- Deploy **without** a DB env var and Netlify falls back to a per-instance file store that
+  does not persist across cold starts. Always set `MONGODB_URI` (or `DATABASE_URL`) on Netlify.
+- Atlas note: if the site can't connect, it's almost always the Network Access allow-list
+  (must include 0.0.0.0/0) or a wrong password in the URI.

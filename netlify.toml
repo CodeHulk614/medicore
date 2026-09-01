@@ -9,7 +9,7 @@
 [functions]
   node_bundler = "esbuild"
   # bundle these into the function
-  external_node_modules = ["express", "bcryptjs", "jsonwebtoken", "cors", "serverless-http", "@netlify/blobs", "pg"]
+  external_node_modules = ["express", "bcryptjs", "jsonwebtoken", "cors", "serverless-http", "@netlify/blobs", "pg", "mongodb"]
 
 # every /api call goes to the function
 [[redirects]]
