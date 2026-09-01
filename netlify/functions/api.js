@@ -8,6 +8,7 @@
 // rapid polling can never clobber a write (this is what makes clock-in stick).
 // Reads take a consistent snapshot and never persist.
 process.env.MC_SERVERLESS = '1';
+if (process.env.ENFORCE_CLOCKIN === undefined) process.env.ENFORCE_CLOCKIN = '1';  // deployed apps require clock-in by default
 
 const serverless = require('serverless-http');
 const store = require('../../store.js');
