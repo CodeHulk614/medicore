@@ -425,16 +425,51 @@ SCREENS.today={ body(){
   ${DATA.roster.length?DATA.roster.map(clientCard).join(''):emptyState('No clients yet','Register a household to begin.')}`;
 }};
 function clientCard(p){ return `<div class="card tap" style="margin-bottom:10px" onclick="openClient('${p.id}')"><div class="qrow"><div class="avatar sm soft">${(p.first||'?')[0]}${(p.last||'')[0]||''}</div><div class="grow"><div class="k">${p.first} ${p.last}</div><div class="mini">${svg(I.pin,12)} ${p.area||''} \u00b7 ${(p.conditions&&p.conditions[0]&&p.conditions[0].name)||p.tier||''}</div></div>${/(due)/i.test(p.nextVisit||'')?`<span class="pill gold">Due</span>`:svg(I.chev,20)}</div></div>`; }
-function openClient(id){ const p=DATA.roster.find(x=>x.id===id); if(!p)return;
-  openSheet(`<div class="grab"></div><div class="qrow" style="margin-bottom:6px"><div class="avatar lg soft">${(p.first||'?')[0]}${(p.last||'')[0]||''}</div><div><div style="font-weight:700;font-size:1.1rem">${p.first} ${p.last}</div><div class="mini">${p.hn} \u00b7 ${p.area||''}</div></div></div>
-  <div class="mini" style="margin-bottom:14px">${p.nextVisit||''}</div>
-  <div class="field"><label>Visit note</label><input id="vNote" placeholder="e.g. Antenatal check, BP normal"></div>
-  <label class="qrow" style="gap:10px;margin-bottom:14px"><input type="checkbox" id="vDanger" style="width:20px;height:20px"> <span style="font-weight:600;color:var(--coral)">Danger sign, refer urgently</span></label>
-  <button class="btn btn-primary btn-block btn-lg tap" onclick="logVisit('${p.id}')">Save visit</button>`); }
-async function logVisit(id){ const note=($('vNote').value||'').trim(), danger=$('vDanger').checked;
-  const r=await submit('/api/chw/visit',{patientId:id,note,danger});
+async function openClient(id){ const p=DATA.roster.find(x=>x.id===id); if(!p)return;
+  openSheet(`<div class="grab"></div><div class="mini">Loading\u2026</div>`);
+  let h=null; try{ h=await api('/api/chw/household/'+id); }catch(e){}
+  const imm=(h&&h.immunizations)||[]; const refs=(h&&h.referrals)||[]; const vis=(h&&h.visits)||[];
+  const anc=(h&&h.client&&h.client.anc)||null;
+  openSheet(`<div class="grab"></div><div class="qrow" style="margin-bottom:6px"><div class="avatar lg soft">${(p.first||'?')[0]}${(p.last||'')[0]||''}</div><div><div style="font-weight:700;font-size:1.1rem">${p.first} ${p.last}</div><div class="mini">${p.hn} \u00b7 ${p.sex||''} \u00b7 ${p.area||''}</div></div></div>
+  <div class="mini" style="margin-bottom:12px">${p.nextVisit||''}${anc?(' \u00b7 ANC '+anc.weeks+'w, '+anc.visits+' visit(s)'):''}</div>
+
+  <div class="section-h"><h2 style="font-size:1rem">Record a home visit</h2></div>
+  <div class="field"><label>Visit note / findings</label><input id="vNote" placeholder="e.g. well, feeding fine"></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>BP (optional)</label><input id="vBp" placeholder="120/80"></div><div class="field grow"><label>Temp \u00b0C (optional)</label><input id="vTemp" placeholder="36.8"></div></div>
+  <label class="qrow" style="gap:10px;margin-bottom:12px"><input type="checkbox" id="vDanger" style="width:20px;height:20px"> <span style="font-weight:600;color:var(--coral)">Danger sign \u2014 refer urgently</span></label>
+  <button class="btn btn-primary btn-block tap" onclick="logVisit('${p.id}')">Save visit</button>
+
+  <div class="section-h" style="margin-top:16px"><h2 style="font-size:1rem">Refer to hospital</h2></div>
+  <div class="field"><label>Reason</label><input id="rfReason" placeholder="e.g. persistent fever, needs review"></div>
+  <div class="qrow" style="gap:8px;align-items:center;margin-bottom:10px"><label class="qrow" style="gap:8px;margin:0"><input type="checkbox" id="rfUrgent" style="width:18px;height:18px"> Urgent</label>
+    <button class="btn btn-line tap" style="flex:1" onclick="referClient('${p.id}')">Send referral</button></div>
+
+  <div class="section-h" style="margin-top:6px"><h2 style="font-size:1rem">Record immunization</h2></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Vaccine</label><select id="imVac"><option value="">Select\u2026</option>${['BCG','OPV','Pentavalent','PCV','Measles','Yellow fever','Vitamin A','Tetanus (ANC)'].map(v=>`<option>${v}</option>`).join('')}</select></div><div class="field grow"><label>Dose</label><input id="imDose" placeholder="e.g. 1st"></div></div>
+  <button class="btn btn-line btn-block tap" onclick="recordImm('${p.id}')">Add immunization</button>
+
+  ${p.sex==='female'?`<div class="section-h" style="margin-top:16px"><h2 style="font-size:1rem">Antenatal (ANC)</h2></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Gestation (weeks)</label><input id="ancW" type="number" value="${anc?anc.weeks:''}"></div><div class="field grow"><label>BP</label><input id="ancBp" placeholder="120/80"></div></div>
+  <button class="btn btn-line btn-block tap" onclick="ancUpdate('${p.id}')">Log ANC visit</button>`:''}
+
+  <div class="section-h" style="margin-top:16px"><h2 style="font-size:1rem">History</h2></div>
+  <div class="menu-card">
+    ${refs.map(r=>`<div class="lrow"><div class="grow"><div class="t">Referral${r.urgency==='urgent'?' \u00b7 URGENT':''}</div><div class="s">${r.reason} \u00b7 ${r.status}</div></div></div>`).join('')}
+    ${imm.map(i=>`<div class="lrow"><div class="grow"><div class="t">Immunization \u00b7 ${i.vaccine}</div><div class="s">${i.dose||''} ${i.date}</div></div></div>`).join('')}
+    ${vis.map(v=>`<div class="lrow"><div class="grow"><div class="t">Visit</div><div class="s">${v.reason} \u00b7 ${v.when}</div></div></div>`).join('')}
+    ${(!refs.length&&!imm.length&&!vis.length)?'<div class="lrow"><div class="s">No history yet.</div></div>':''}
+  </div>`); }
+async function logVisit(id){ const note=($('vNote').value||'').trim(), danger=$('vDanger').checked; const bp=($('vBp')||{}).value||'', temp=($('vTemp')||{}).value||'';
+  const full=[note,bp?('BP '+bp):'',temp?('Temp '+temp):''].filter(Boolean).join(' \u00b7 ')||'Home visit';
+  const r=await submit('/api/chw/visit',{patientId:id,note:full,danger});
   closeSheet(); await load(); render();
-  toast(r.queued?'Saved offline, will sync'+(danger?' (referral queued)':''):(danger?'Visit saved and referral raised':'Visit saved to record')); }
+  toast(r.queued?'Saved offline, will sync':(danger?'Visit saved and referral raised':'Visit saved to record')); }
+async function referClient(id){ const reason=($('rfReason').value||'').trim(); if(!reason)return toast('Enter a reason'); const urgency=$('rfUrgent').checked?'urgent':'routine';
+  try{ await api('/api/chw/refer',{method:'POST',body:{patientId:id,reason,urgency}}); closeSheet(); await load(); render(); toast('Referral sent to the hospital'); }catch(e){ toast(e.message); } }
+async function recordImm(id){ const vaccine=($('imVac').value||'').trim(); if(!vaccine)return toast('Choose a vaccine'); const dose=($('imDose').value||'').trim();
+  try{ await api('/api/chw/immunization',{method:'POST',body:{patientId:id,vaccine,dose}}); toast(vaccine+' recorded'); openClient(id); }catch(e){ toast(e.message); } }
+async function ancUpdate(id){ const weeks=($('ancW').value||''), bp=($('ancBp').value||'');
+  try{ await api('/api/chw/anc',{method:'POST',body:{patientId:id,weeks,bp}}); toast('ANC visit logged'); openClient(id); }catch(e){ toast(e.message); } }
 SCREENS.register={ body(){
   return `<div style="margin-top:8px"></div><div class="card">
   <div class="field"><label>First name</label><input id="rFirst" placeholder="First name"></div>

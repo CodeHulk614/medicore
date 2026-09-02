@@ -392,9 +392,9 @@ function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentEl
 (function(){ try{ const s=localStorage.getItem('mcs-theme'); if(s)theme=s; else if(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)theme='dark'; }catch(e){} document.documentElement.setAttribute('data-theme',theme); })();
 
 let DATA={};
-TABS=[{id:'home',lab:'Today',ic:I.home},{id:'orders',lab:'Orders',ic:I.flask},{id:'me',lab:'Me',ic:I.user}];
+TABS=[{id:'home',lab:'Today',ic:I.home},{id:'orders',lab:'Orders',ic:I.flask},{id:'catalog',lab:'Catalog',ic:I.list||I.flask},{id:'me',lab:'Me',ic:I.user}];
 async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'lab'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'lab',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
-async function load(){ const [ov,oz]=await Promise.all([api('/api/lab/overview'),api('/api/lab/orders')]); DATA={ov,orders:(oz.active||[]).concat(oz.done||[])}; }
+async function load(){ const [ov,oz,cat]=await Promise.all([api('/api/lab/overview'),api('/api/lab/orders'),api('/api/lab/catalog').catch(()=>[])]); DATA={ov,orders:(oz.active||[]).concat(oz.done||[]),catalog:cat}; }
 SCREENS.home={ body(){ const o=DATA.ov;
   return `<div class="greeting"><div class="hello">${o.facility}.</div><div class="sub">Diagnostics console</div></div>
   <div class="qa-grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px">
@@ -416,18 +416,38 @@ function orderRow(o){ const badge=o.status==='ordered'?'<span class="pill gold">
   return `<div class="card tap" style="margin-bottom:10px" onclick="openOrder('${o.id}')"><div class="qrow"><div class="avatar sm soft">${svg(I.flask,20)}</div><div class="grow"><div class="k">${(o.detail.tests||[]).join(', ')}</div><div class="mini">${o.patient} \u00b7 ${o.by}</div></div>${badge}</div></div>`; }
 SCREENS.orders={ body(){ return DATA.orders.length?`<div style="margin-top:8px"></div>`+DATA.orders.map(orderRow).join(''):emptyState('No orders','Nothing here yet.'); }};
 function openOrder(id){ const o=DATA.orders.find(x=>x.id===id); if(!o)return; const tests=o.detail.tests||[];
-  if(o.status==='resulted'||o.status==='closed'){ openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:6px">${tests.join(', ')}</div><div class="mini">Result already posted to the patient record.</div>`); return; }
-  const rows=tests.map((t,i)=>`<div class="field"><label>${t}</label><div class="qrow" style="gap:8px"><input id="rv${i}" placeholder="Value" style="margin-bottom:0"><input id="ru${i}" placeholder="Unit" style="margin-bottom:0;max-width:90px"></div></div>`).join('');
+  if(o.status==='resulted'||o.status==='closed'){ const rr=(o.result||[]).map(r=>{ const col=r.flag&&r.flag!=='normal'?'var(--coral)':'var(--green,#15A88A)'; const rng=r.low!=null||r.high!=null?` (ref ${r.low!=null?r.low:''}${r.low!=null&&r.high!=null?'\u2013':''}${r.high!=null?r.high:''})`:''; return `<div class="lrow"><div class="grow"><div class="t">${r.test}</div><div class="s">${rng}</div></div><div style="text-align:right;font-weight:700;color:${col}">${r.value} ${r.unit||''}${r.flag&&r.flag!=='normal'?(' \u00b7 '+r.flag.toUpperCase()):''}</div></div>`; }).join('');
+    openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:6px">${tests.join(', ')}</div><div class="mini" style="margin-bottom:10px">Posted to the patient record.</div><div class="menu-card">${rr||'<div class="lrow"><div class="s">No values.</div></div>'}</div>`); return; }
+  const cat=DATA.catalog||[]; const findCat=n=>cat.find(c=>(''+n).toLowerCase().includes((c.name||'').toLowerCase())||(c.name||'').toLowerCase().includes((''+n).toLowerCase()));
+  const rows=tests.map((t,i)=>{ const c=findCat(t); const ref=c?(c.qualitative?('expected '+(c.refText||'\u2014')):((c.refLow!=null?c.refLow:'')+(c.refLow!=null&&c.refHigh!=null?' \u2013 ':'')+(c.refHigh!=null?c.refHigh:'')+' '+(c.unit||''))):''; const unit=c?c.unit:'';
+    return `<div class="field"><label>${t}${ref?` <span class="mini" style="color:var(--muted)">ref ${ref}</span>`:''}</label><div class="qrow" style="gap:8px"><input id="rv${i}" placeholder="Value" style="margin-bottom:0" oninput="flagPreview(${i},'${(t).replace(/'/g,'')}')"><input id="ru${i}" placeholder="Unit" value="${unit}" style="margin-bottom:0;max-width:90px"></div><div id="fp${i}" class="mini" style="margin-top:4px"></div></div>`; }).join('');
   openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:2px">${tests.join(', ')}</div><div class="mini" style="margin-bottom:14px">${o.patient} \u00b7 ordered by ${o.by}</div>
     ${o.status==='ordered'?`<button class="btn btn-soft btn-block tap" style="margin-bottom:14px" onclick="collect('${o.id}')">Mark sample collected</button>`:'<div class="mini" style="margin-bottom:12px;color:var(--teal)">Sample collected. Enter results below.</div>'}
     <div style="font-weight:700;margin-bottom:8px">Enter results</div>${rows}
     <button class="btn btn-primary btn-block btn-lg tap" onclick="postResult('${o.id}',${tests.length})">Post to patient record</button>`);
 }
 async function collect(id){ try{ await api('/api/lab/orders/'+id+'/collect',{method:'POST',body:{}}); await load(); closeSheet(); openOrder(id); toast('Sample marked collected'); }catch(e){ toast(e.message); } }
+function flagPreview(i,test){ const cat=DATA.catalog||[]; const c=cat.find(x=>(''+test).toLowerCase().includes((x.name||'').toLowerCase())||(x.name||'').toLowerCase().includes((''+test).toLowerCase())); const el=document.getElementById('fp'+i); const v=(document.getElementById('rv'+i)||{}).value; if(!el||!c||!v){ if(el)el.textContent=''; return; }
+  let flag='normal'; if(c.qualitative){ flag=(''+v).trim().toLowerCase()===(c.refText||'').trim().toLowerCase()?'normal':'abnormal'; } else { const n=parseFloat(v); if(!isNaN(n)){ if(c.refLow!=null&&n<c.refLow)flag='low'; else if(c.refHigh!=null&&n>c.refHigh)flag='high'; } }
+  const col=flag==='normal'?'var(--green,#15A88A)':'var(--coral)'; el.textContent=flag==='normal'?'\u2713 within range':('\u26a0 '+flag.toUpperCase()); el.style.color=col; }
 async function postResult(id,n){ const results=[]; const o=DATA.orders.find(x=>x.id===id); const tests=o.detail.tests||[];
   for(let i=0;i<n;i++){ const v=($('rv'+i)||{}).value; if(v) results.push({test:tests[i],value:v,unit:($('ru'+i)||{}).value||''}); }
   if(!results.length){ toast('Enter at least one value'); return; }
   try{ await api('/api/lab/orders/'+id+'/result',{method:'POST',body:{results}}); await load(); closeSheet(); render(); toast('Results posted to the patient record'); }catch(e){ toast(e.message); } }
+SCREENS.catalog={ body(){ const cat=DATA.catalog||[]; return `<div class="greeting"><div class="hello">Test catalog.</div><div class="sub">Tests and reference ranges</div></div>
+  <button class="btn btn-primary btn-block tap" style="margin:12px 0" onclick="catSheet()">+ Add test</button>
+  <input id="catSearch" placeholder="Search tests\u2026" oninput="renderCat()" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
+  <div id="catList"></div>`; }, after(){ renderCat(); } };
+function renderCat(){ const el=document.getElementById('catList'); if(!el)return; const q=(document.getElementById('catSearch')&&document.getElementById('catSearch').value||'').toLowerCase();
+  const list=(DATA.catalog||[]).filter(c=>!q||c.name.toLowerCase().includes(q)); el.innerHTML=list.length?list.map(c=>{ const ref=c.qualitative?('expected '+(c.refText||'\u2014')):((c.refLow!=null?c.refLow:'')+(c.refLow!=null&&c.refHigh!=null?' \u2013 ':'')+(c.refHigh!=null?c.refHigh:'')+' '+(c.unit||'')); return `<div class="card tap" style="margin-bottom:10px" onclick="catSheet('${c.id}')"><div class="qrow"><div class="grow"><div class="k">${c.name} <span class="mini">${c.code}</span></div><div class="mini">${c.specimen} \u00b7 ref ${ref} \u00b7 \u20a6${c.price}</div></div></div></div>`; }).join(''):emptyState('No tests','Add a test to the catalog.'); }
+function catSheet(id){ const c=id?(DATA.catalog||[]).find(x=>x.id===id):null; openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">${c?'Edit test':'Add test'}</div>
+  <div class="field"><label>Name</label><input id="ctName" value="${c?c.name:''}" placeholder="e.g. Haemoglobin"></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Specimen</label><input id="ctSpec" value="${c?c.specimen:'Blood'}"></div><div class="field grow"><label>Unit</label><input id="ctUnit" value="${c?c.unit:''}" placeholder="g/dL"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Ref low</label><input id="ctLow" type="number" value="${c&&c.refLow!=null?c.refLow:''}"></div><div class="field grow"><label>Ref high</label><input id="ctHigh" type="number" value="${c&&c.refHigh!=null?c.refHigh:''}"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Or expected (qualitative)</label><input id="ctText" value="${c?c.refText:''}" placeholder="Negative"></div><div class="field grow"><label>Price (\u20a6)</label><input id="ctPrice" type="number" value="${c?c.price:0}"></div></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="saveCat(${c?`'${c.id}'`:'null'})">${c?'Save':'Add test'}</button>`); }
+async function saveCat(id){ const g=x=>document.getElementById(x).value; const body={name:g('ctName'),specimen:g('ctSpec'),unit:g('ctUnit'),refLow:g('ctLow'),refHigh:g('ctHigh'),refText:g('ctText'),price:Number(g('ctPrice'))||0};
+  try{ await api(id?('/api/lab/catalog/'+id):'/api/lab/catalog',{method:'POST',body}); closeSheet(); await load(); render(); toast(id?'Saved':'Test added'); }catch(e){ toast(e.message); } }
 SCREENS.me={ body(){ return `<div style="margin-top:8px"></div><div class="card"><div class="qrow"><div class="avatar lg gold">${svg(I.flask,22)}</div><div><div style="font-weight:700">${DATA.ov.facility}</div><div class="mini">lab@demo.ng</div></div></div></div>
   <button class="btn btn-block tap" style="margin-top:16px;justify-content:flex-start;gap:10px;background:var(--coral-soft);color:var(--coral)" onclick="logout()">${svg(I.logout,20)} Log out</button>`; }};
 

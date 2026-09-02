@@ -394,7 +394,7 @@ function toggleTheme(){ theme=theme==='dark'?'light':'dark'; document.documentEl
 let DATA={};
 TABS=[{id:'home',lab:'Today',ic:I.home},{id:'queue',lab:'Dispense',ic:I.pill},{id:'stock',lab:'Inventory',ic:I.box},{id:'me',lab:'Me',ic:I.user}];
 async function boot(){ try{ if(window.mcPlanGate) mcPlanGate.mount({api:API,token:TOKEN,module:'pharmacy'}); }catch(e){} try{ if(window.mcClockGate) mcClockGate.mount({api:API,token:TOKEN,role:'pharmacy',onIn:function(){ boot(); }}); }catch(e){} await load(); await enterApp(); }
-async function load(){ const [ov,q,inv]=await Promise.all([api('/api/pharm/overview'),api('/api/pharm/queue'),api('/api/pharm/inventory')]); DATA={ov,queue:(q.active||[]),done:(q.done||[]),inv}; }
+async function load(){ const [ov,q,invOv,invItems]=await Promise.all([api('/api/pharm/overview'),api('/api/pharm/queue'),api('/api/pharm/inv/overview').catch(()=>({})),api('/api/pharm/inv/items').catch(()=>[])]); DATA={ov,queue:(q.active||[]),done:(q.done||[]),invOv,invItems}; }
 SCREENS.home={ body(){ const o=DATA.ov;
   return `<div class="greeting"><div class="hello">${o.facility}.</div><div class="sub">Pharmacy console</div></div>
   <div class="qa-grid" style="grid-template-columns:repeat(3,1fr);margin-top:16px">
@@ -403,7 +403,7 @@ SCREENS.home={ body(){ const o=DATA.ov;
     <div class="stat"><div class="n" style="${o.overdue?'color:var(--coral)':''}">${o.overdue}</div><div class="l">Overdue</div></div>
     <div class="stat"><div class="n">${o.dispensedToday}</div><div class="l">Dispensed today</div></div>
     <div class="stat"><div class="n">${o.avgTurnaroundMin!=null?o.avgTurnaroundMin+'m':'--'}</div><div class="l">Avg turnaround</div></div>
-    <div class="stat"><div class="n" style="${(o.low+o.out)?'color:var(--gold)':''}">${o.low+o.out}</div><div class="l">Stock alerts</div></div>
+    <div class="stat"><div class="n" style="${(DATA.invOv&&(DATA.invOv.lowStock+DATA.invOv.outOfStock))?'color:var(--gold)':''}" onclick="switchTab('stock')">${DATA.invOv?(DATA.invOv.lowStock+DATA.invOv.outOfStock):0}</div><div class="l">Stock alerts</div></div>
   </div>
   ${o.breakdown?pipelineBar([['Ordered',o.breakdown.ordered,'#E9B23C'],['Verified',o.breakdown.verified,'#3FB2BB'],['Ready',o.breakdown.ready,'#15A88A'],['Collected',o.breakdown.collected,'#93A9AA']]):''}
   <div class="section-h"><h2>Prescription queue</h2><span class="more" onclick="switchTab('queue')">See all</span></div>
@@ -440,11 +440,87 @@ async function doCollect(id){ const code=(document.getElementById('pxCode').valu
 SCREENS.queue={ body(){ return DATA.queue.length?`<div style="margin-top:8px"></div>`+DATA.queue.map(rxRow).join(''):emptyState('Queue empty','New prescriptions from doctors will appear here.'); }};
 async function pharmAct(id,action){ const msg={verify:'Prescription verified',ready:'Marked ready for pickup',collect:'Marked as collected',remind:'Reminder sent to the patient'}[action];
   try{ await api('/api/pharm/orders/'+id+'/'+action,{method:'POST',body:{}}); await load(); render(); toast(msg); }catch(e){ toast(e.message); } }
-SCREENS.stock={ body(){
-  return `<div style="margin-top:8px"></div><div class="menu-card">`+DATA.inv.map(i=>`<div class="lrow"><div class="grow"><div class="t">${i.name}</div><div class="s">${ngn(i.price)} \u00b7 ${i.unit}</div></div>
-    <div class="qrow" style="gap:8px"><button class="btn btn-soft tap" style="padding:6px 10px" onclick="adjust('${i.id}',-1)">-</button><span class="k" style="min-width:34px;text-align:center;color:${i.stock===0?'var(--coral)':i.stock<=10?'var(--gold-deep)':'var(--ink)'}">${i.stock}</span><button class="btn btn-soft tap" style="padding:6px 10px" onclick="adjust('${i.id}',1)">+</button></div></div>`).join('')+`</div>`;
-}};
-async function adjust(id,d){ try{ await api('/api/pharm/inventory/'+id+'/adjust',{method:'POST',body:{delta:d}}); await load(); render(); }catch(e){ toast(e.message); } }
+SCREENS.stock={ body(){ const o=DATA.invOv||{}; const exp=o.expiring||{};
+  const chip=(n,l,warn)=>`<div class="stat" style="min-width:0"><div class="n" style="${warn&&n?'color:var(--coral)':''};font-size:1.25rem">${n||0}</div><div class="l">${l}</div></div>`;
+  return `<div class="greeting"><div class="hello">Inventory.</div><div class="sub">Batches, expiry &amp; stock control</div></div>
+  <div class="qa-grid" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
+    ${chip(o.items,'Items')}${chip(o.lowStock,'Low',true)}${chip(o.outOfStock,'Out',true)}
+    ${chip(exp.d30,'Exp \u226430d',true)}${chip((exp.d60||0)+(exp.d90||0),'Exp \u226490d',true)}${chip(o.controlled,'Controlled')}
+  </div>
+  <div class="qrow" style="gap:8px;margin:12px 0;flex-wrap:wrap">
+    <button class="btn btn-primary tap" onclick="receiveSheet()">Receive stock</button>
+    <button class="btn btn-line tap" onclick="poScreen()">Purchase orders${o.openPOs?(' \u00b7 '+o.openPOs):''}</button>
+    <button class="btn btn-line tap" onclick="recallsScreen()">Recalls${o.openRecalls?(' \u00b7 '+o.openRecalls):''}</button>
+    <button class="btn btn-line tap" onclick="newItemSheet()">+ Item</button>
+  </div>
+  <input id="invSearch" placeholder="Search medicines\u2026" oninput="renderInv()" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px">
+  <div id="invList"></div>`; }, after(){ renderInv(); } };
+function invRow(i){ const flags=[]; if(i.out)flags.push('<span class="pill" style="background:var(--coral-soft);color:var(--coral)">Out</span>'); else if(i.low)flags.push('<span class="pill gold">Low</span>'); if(i.nearExpiry)flags.push('<span class="pill" style="background:var(--coral-soft);color:var(--coral)">'+i.nearExpiry+' exp\u2264 90d</span>'); if(i.controlled)flags.push('<span class="pill teal">Controlled</span>');
+  return `<div class="card tap" style="margin-bottom:10px" onclick="openItem('${i.id}')"><div class="qrow"><div class="grow"><div class="k">${i.name} <span class="mini">${i.strength||''} ${i.form||''}</span></div><div class="mini">${i.sku} \u00b7 ${i.batches} batch(es) \u00b7 ${ngn(i.price)}/${i.unit}${i.earliestExpiry?(' \u00b7 first exp '+i.earliestExpiry):''}</div></div>
+    <div style="text-align:right"><div class="k" style="color:${i.out?'var(--coral)':i.low?'var(--gold-deep,#8a6a12)':'var(--ink)'}">${i.available}</div><div class="mini">avail${i.committed?(' \u00b7 '+i.committed+' held'):''}</div></div></div>
+    ${flags.length?`<div class="qrow" style="gap:6px;margin-top:8px;flex-wrap:wrap">${flags.join('')}</div>`:''}</div>`; }
+function renderInv(){ const el=document.getElementById('invList'); if(!el)return; const q=(document.getElementById('invSearch')&&document.getElementById('invSearch').value||'').toLowerCase();
+  const list=(DATA.invItems||[]).filter(i=>!q||i.name.toLowerCase().includes(q)||(i.sku||'').toLowerCase().includes(q));
+  el.innerHTML=list.length?list.map(invRow).join(''):emptyState('No items','Add items or receive stock to get started.'); }
+async function openItem(id){ let d; try{ d=await api('/api/pharm/inv/items/'+id); }catch(e){ return toast(e.message); } const it=d.item;
+  const batches=d.batches.map(b=>{ const warn=b.days!=null&&b.days<90; const q=b.status==='quarantined';
+    return `<div class="lrow"><div class="grow"><div class="t">${b.batchNo} ${q?'<span class="pill" style="background:var(--coral-soft);color:var(--coral)">quarantined</span>':''}</div><div class="s" style="${warn&&!q?'color:var(--coral)':''}">exp ${b.expiry||'\u2014'}${b.days!=null?(' \u00b7 '+(b.days<0?'EXPIRED':b.days+'d')):''} \u00b7 ${b.qtyOnHand} on hand \u00b7 ₦${b.cost} cost</div></div>
+      ${b.status==='active'?`<div class="qrow" style="gap:6px"><button class="btn btn-soft tap" style="padding:6px 9px" onclick="returnSupplierSheet('${b.id}','${b.batchNo}',${b.qtyOnHand})">Return</button><button class="btn tap" style="padding:6px 9px;background:var(--coral-soft);color:var(--coral)" onclick="recallBatch('${b.id}','${b.batchNo}')">Recall</button></div>`:''}</div>`; }).join('');
+  const moves=d.moves.slice(0,8).map(m=>`<div class="lrow"><div class="grow"><div class="t" style="font-size:.9rem">${m.type} <span style="color:${m.qty<0?'var(--coral)':'var(--green,#15A88A)'}">${m.qty>0?'+':''}${m.qty}</span></div><div class="s">${m.reason||''} \u00b7 ${m.userName} \u00b7 ${new Date(m.at).toLocaleString()}</div></div></div>`).join('');
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.15rem">${it.name} <span class="mini">${it.strength||''} ${it.form||''}</span></div>
+    <div class="mini" style="margin-bottom:10px">${it.sku} \u00b7 reorder at ${it.reorderPoint}${it.controlled?' \u00b7 controlled substance':''}</div>
+    <div class="qa-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <div class="stat"><div class="n">${it.onHand}</div><div class="l">On hand</div></div>
+      <div class="stat"><div class="n">${it.committed}</div><div class="l">Committed</div></div>
+      <div class="stat"><div class="n" style="${it.available<=it.reorderPoint?'color:var(--gold)':''}">${it.available}</div><div class="l">Available</div></div></div>
+    <div class="qrow" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-primary tap" onclick="receiveSheet('${it.id}')">Receive batch</button>
+      <button class="btn btn-line tap" onclick="adjustSheet('${it.id}')">Adjust</button>
+    </div>
+    <div class="section-h"><h2 style="font-size:1rem">Batches (FEFO order)</h2></div><div class="menu-card">${batches||'<div class="lrow"><div class="s">No batches. Receive stock.</div></div>'}</div>
+    <div class="section-h" style="margin-top:14px"><h2 style="font-size:1rem">Recent movements</h2></div><div class="menu-card">${moves||'<div class="lrow"><div class="s">No movements yet.</div></div>'}</div>`); }
+function newItemSheet(){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Add catalog item</div>
+  <div class="field"><label>Name</label><input id="niName" placeholder="e.g. Ibuprofen"></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Form</label><input id="niForm" placeholder="Tablet"></div><div class="field grow"><label>Strength</label><input id="niStr" placeholder="400mg"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Unit</label><input id="niUnit" placeholder="pack of 20"></div><div class="field grow"><label>Price (₦)</label><input id="niPrice" type="number" inputmode="numeric"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Reorder point</label><input id="niRop" type="number" inputmode="numeric" value="20"></div><div class="field grow" style="display:flex;align-items:center;gap:8px;margin-top:22px"><input type="checkbox" id="niCtrl" style="width:auto"><label style="margin:0">Controlled</label></div></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="createItem()">Add item</button>`); }
+async function createItem(){ const g=id=>document.getElementById(id).value; try{ await api('/api/pharm/inv/items',{method:'POST',body:{name:g('niName'),form:g('niForm'),strength:g('niStr'),unit:g('niUnit'),price:Number(g('niPrice'))||0,reorderPoint:Number(g('niRop'))||0,controlled:document.getElementById('niCtrl').checked}}); closeSheet(); await load(); render(); toast('Item added'); }catch(e){ toast(e.message); } }
+async function receiveSheet(itemId){ const items=DATA.invItems||[]; const opts=items.map(i=>`<option value="${i.id}" ${i.id===itemId?'selected':''}>${i.name} ${i.strength||''}</option>`).join('');
+  let sups=[]; try{ sups=await api('/api/pharm/inv/suppliers'); }catch(e){}
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Receive stock</div>
+  <div class="field"><label>Item</label><select id="rcItem">${opts}</select></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Batch no.</label><input id="rcBatch" placeholder="e.g. B2731"></div><div class="field grow"><label>Expiry</label><input id="rcExp" type="date"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Quantity</label><input id="rcQty" type="number" inputmode="numeric" min="1"></div><div class="field grow"><label>Unit cost (₦)</label><input id="rcCost" type="number" inputmode="numeric"></div></div>
+  <div class="field"><label>Supplier</label><select id="rcSup"><option value="">\u2014</option>${sups.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="doReceive()">Add to inventory</button>`); }
+async function doReceive(){ const g=id=>document.getElementById(id).value; const body={itemId:g('rcItem'),batchNo:g('rcBatch'),expiry:g('rcExp'),qty:Number(g('rcQty'))||0,cost:Number(g('rcCost'))||0,supplierId:g('rcSup')};
+  if(body.qty<=0)return toast('Enter a quantity'); try{ await api('/api/pharm/inv/receive',{method:'POST',body}); closeSheet(); await load(); render(); toast('Stock received'); }catch(e){ toast(e.message); } }
+function adjustSheet(itemId){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Adjust stock</div><div class="mini" style="margin-bottom:12px">Use for damage, loss, or a found-stock correction. Recorded with your name in the ledger.</div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Change (\u2212 removes)</label><input id="ajDelta" type="number" placeholder="-3"></div><div class="field grow"><label>Reason</label><input id="ajReason" placeholder="damaged"></div></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="doAdjust('${itemId}')">Post adjustment</button>`); }
+async function doAdjust(id){ const delta=Number(document.getElementById('ajDelta').value)||0; const reason=document.getElementById('ajReason').value; if(!delta)return toast('Enter a change'); try{ await api('/api/pharm/inv/items/'+id+'/adjust',{method:'POST',body:{delta,reason}}); closeSheet(); await load(); render(); toast('Adjusted'); }catch(e){ toast(e.message); } }
+function recallBatch(batchId,batchNo){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Recall batch ${batchNo}</div><div class="mini" style="margin-bottom:12px">Quarantines all remaining stock in this batch and opens a supplier return claim.</div>
+  <div class="field"><label>Reason</label><input id="rcReason" placeholder="manufacturer recall / contamination"></div>
+  <button class="btn btn-block btn-lg tap" style="background:var(--coral);color:#fff" onclick="doRecall('${batchId}')">Quarantine &amp; recall</button>`); }
+async function doRecall(id){ try{ const r=await api('/api/pharm/inv/recall',{method:'POST',body:{batchId:id,reason:document.getElementById('rcReason').value}}); closeSheet(); await load(); render(); toast(r.quarantined+' units quarantined'); }catch(e){ toast(e.message); } }
+function returnSupplierSheet(batchId,batchNo,max){ openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Return ${batchNo} to supplier</div><div class="mini" style="margin-bottom:12px">Removes stock and records a supplier credit.</div>
+  <div class="field"><label>Quantity (max ${max})</label><input id="rsQty" type="number" inputmode="numeric" max="${max}" value="${max}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="doReturnSupplier('${batchId}')">Return &amp; record credit</button>`); }
+async function doReturnSupplier(id){ try{ const r=await api('/api/pharm/inv/return-supplier',{method:'POST',body:{batchId:id,qty:Number(document.getElementById('rsQty').value)||0}}); closeSheet(); await load(); render(); toast('Returned \u00b7 credit '+ngn(r.credit)); }catch(e){ toast(e.message); } }
+async function recallsScreen(){ let recalls=[]; try{ recalls=await api('/api/pharm/inv/recalls'); }catch(e){}
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Recalls</div>${recalls.length?('<div class="menu-card">'+recalls.map(r=>`<div class="lrow"><div class="grow"><div class="t">${r.item} \u00b7 ${r.batchNo}</div><div class="s">${r.reason} \u00b7 ${r.qty} units \u00b7 ${r.claimStatus}</div></div>${r.claimStatus==='open'?`<button class="btn btn-soft tap" style="padding:6px 9px" onclick="claimRecall('${r.id}')">Send claim</button>`:''}</div>`).join('')+'</div>'):'<div class="mini">No recalls.</div>'}`); }
+async function claimRecall(id){ try{ await api('/api/pharm/inv/recalls/'+id+'/claim',{method:'POST',body:{status:'sent'}}); recallsScreen(); toast('Claim sent'); }catch(e){ toast(e.message); } }
+async function poScreen(){ let pos=[]; try{ pos=await api('/api/pharm/inv/po'); }catch(e){}
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Purchase orders</div>${pos.length?('<div class="menu-card">'+pos.map(p=>`<div class="lrow"><div class="grow"><div class="t">${p.code} <span class="pill ${p.status==='received'?'green':p.status==='cancelled'?'grey':'gold'}">${p.status}</span></div><div class="s">${p.supplier||'\u2014'} \u00b7 ${p.lines.length} line(s) \u00b7 ${p.lines.reduce((s,l)=>s+l.qty,0)} units</div></div>${(p.status==='sent'||p.status==='draft')?`<button class="btn btn-primary tap" style="padding:6px 10px" onclick="receivePO('${p.id}')">Receive</button>`:''}</div>`).join('')+'</div>'):'<div class="mini">No purchase orders.</div>'}`); }
+async function receivePO(id){ let pos=[]; try{ pos=await api('/api/pharm/inv/po'); }catch(e){} const po=pos.find(p=>p.id===id); if(!po)return;
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Receive ${po.code}</div><div class="mini" style="margin-bottom:12px">Enter batch number and expiry for each line as goods arrive.</div>
+    ${po.lines.map((l,i)=>`<div class="card" style="margin-bottom:8px"><div class="k">${l.name} \u00b7 ${l.qty} units</div>
+      <div class="qrow" style="gap:8px;margin-top:6px"><div class="field grow"><label>Batch</label><input id="po${i}b" placeholder="batch no."></div><div class="field grow"><label>Expiry</label><input id="po${i}e" type="date"></div></div>
+      <input type="hidden" id="po${i}i" value="${l.itemId}"><input type="hidden" id="po${i}q" value="${l.qty}"><input type="hidden" id="po${i}c" value="${l.cost}"></div>`).join('')}
+    <button class="btn btn-primary btn-block btn-lg tap" onclick="doReceivePO('${id}',${po.lines.length})">Receive all lines</button>`); }
+async function doReceivePO(id,n){ const lines=[]; for(let i=0;i<n;i++){ lines.push({itemId:document.getElementById('po'+i+'i').value,batchNo:document.getElementById('po'+i+'b').value,expiry:document.getElementById('po'+i+'e').value,qty:Number(document.getElementById('po'+i+'q').value),cost:Number(document.getElementById('po'+i+'c').value)}); }
+  try{ const r=await api('/api/pharm/inv/po/'+id+'/receive',{method:'POST',body:{lines}}); closeSheet(); await load(); render(); toast(r.received+' lines received'); }catch(e){ toast(e.message); } }
 SCREENS.me={ body(){ return `<div style="margin-top:8px"></div><div class="card"><div class="qrow"><div class="avatar lg gold">${svg(I.pill,22)}</div><div><div style="font-weight:700">${DATA.ov.facility}</div><div class="mini">pharmacy@demo.ng</div></div></div></div>
   <button class="btn btn-block tap" style="margin-top:16px;justify-content:flex-start;gap:10px;background:var(--coral-soft);color:var(--coral)" onclick="logout()">${svg(I.logout,20)} Log out</button>`; }};
 

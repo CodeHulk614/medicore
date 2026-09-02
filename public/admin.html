@@ -417,7 +417,8 @@ async function load(){
 const ROSTER={list:[],staff:[],att:null,date:new Date().toISOString().slice(0,10)};
 let fleetMapObj=null, fleetMapEl=null, fleetPoll=null, FLEET=null;
 SCREENS.fleet={ body(){ return `<div class="greeting"><div class="hello">Fleet.</div><div class="sub">Live ambulances at your hospital</div></div>
-  <div id="fleetStats" class="qa-grid" style="grid-template-columns:repeat(4,1fr);margin-top:14px"></div>
+  <button class="btn btn-line btn-block tap" style="margin:12px 0" onclick="go('fleetManage')">Manage vehicles, riders &amp; crew</button>
+  <div id="fleetStats" class="qa-grid" style="grid-template-columns:repeat(4,1fr);margin-top:4px"></div>
   <div class="card" style="padding:10px"><div id="fleetMap" data-keep style="height:300px;border-radius:12px;overflow:hidden"></div></div>
   <div class="section-h"><h2>Units</h2></div><div id="fleetList"></div>`;
 }, after(){ ensureFleetMap(); loadFleet(); startFleetPoll(); } };
@@ -430,6 +431,63 @@ function paintFleet(){ if(!FLEET)return; const s=FLEET.stats;
   const list=document.getElementById('fleetList');
   if(list) list.innerHTML=(FLEET.units||[]).map(u=>`<div class="card"><div class="lrow"><div class="grow"><div class="k">${u.name} <span class="mini">${u.plate||''}</span></div><div class="mini">${u.status}${u.crewed?(' · crew: '+(u.crewName||'on board')):' · auto (no crew)'}${(u.eta!=null&&['enroute','transporting'].includes(u.status))?(' · ETA '+Math.max(1,Math.round(u.eta/60))+'m'):''}</div></div><span class="pill ${u.status==='available'?'green':(['enroute','onscene','transporting'].includes(u.status)?'gold':'')}">${u.status}</span></div></div>`).join('')||'<div class="card"><div class="mini">No ambulances registered to this hospital.</div></div>'; }
 function startFleetPoll(){ if(fleetPoll)return; fleetPoll=setInterval(()=>{ if(state.tab==='fleet'){ loadFleet(); } else { clearInterval(fleetPoll); fleetPoll=null; } },2500); }
+// ---------- FLEET & PERSONNEL MANAGEMENT ----------
+let FM={tab:'veh',ov:null,veh:[],riders:[],crew:[]};
+const VEH_TYPES=['Advanced life support','Basic life support','Motorbike medic','Patient transport'];
+const RIDE_TYPES=['Motorbike','Bicycle','Car','Tricycle (Keke)'];
+const CERTS=['Driver','EMT-Basic','EMT-Intermediate','Paramedic'];
+function fmVerPill(v){ return `<span class="pill ${v==='verified'?'green':v==='rejected'?'coral':'gold'}">${v}</span>`; }
+function docFlagPills(flags){ return (flags||[]).map(f=>`<span class="pill" style="background:var(--coral-soft);color:var(--coral)">${f.doc} ${f.state==='expired'?'expired':(f.days+'d')}</span>`).join(' '); }
+SCREENS.fleetManage={ title:'Manage fleet', body(){ const o=FM.ov||{};
+  const tabBtn=(id,l)=>`<button class="btn ${FM.tab===id?'btn-primary':'btn-line'} tap" style="flex:1" onclick="fmSwitch('${id}')">${l}</button>`;
+  return `<div class="greeting"><div class="hello">Fleet &amp; personnel.</div><div class="sub">Vehicles, riders and crew onboarding</div></div>
+  <div class="qa-grid" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+    <div class="stat"><div class="n">${o.inService||0}</div><div class="l">In service</div></div>
+    <div class="stat"><div class="n" style="${o.maintenance?'color:var(--gold)':''}">${o.maintenance||0}</div><div class="l">Maintenance</div></div>
+    <div class="stat"><div class="n" style="${o.vehExpiring?'color:var(--coral)':''}">${o.vehExpiring||0}</div><div class="l">Docs due</div></div>
+    <div class="stat"><div class="n" style="${o.ridersPending?'color:var(--gold)':''}">${o.ridersPending||0}</div><div class="l">Riders pending</div></div>
+  </div>
+  <div class="qrow" style="gap:8px;margin:12px 0">${tabBtn('veh','Vehicles')}${tabBtn('riders','Riders')}${tabBtn('crew','Crew')}</div>
+  <div id="fmBody"></div>`; }, after(){ loadFM(); } };
+async function loadFM(){ try{ FM.ov=await api('/api/admin/fleet/overview'); }catch(e){} try{ FM.veh=await api('/api/admin/fleet/vehicles'); }catch(e){} try{ FM.riders=await api('/api/admin/fleet/riders'); }catch(e){} try{ FM.crew=await api('/api/admin/fleet/crew'); }catch(e){} renderFMHead(); renderFM(); }
+function renderFMHead(){ const s=document.querySelector('#view .qa-grid'); if(s&&SCREENS.fleetManage&&state.tab==='fleet'){} }
+function fmSwitch(t){ FM.tab=t; document.querySelectorAll('#view .qrow .btn').forEach(()=>{}); render(); }
+function renderFM(){ const el=document.getElementById('fmBody'); if(!el)return;
+  if(FM.tab==='veh'){ el.innerHTML=`<button class="btn btn-primary btn-block tap" style="margin-bottom:10px" onclick="vehSheet()">+ Add vehicle</button>`+
+    (FM.veh.map(v=>`<div class="card tap" style="margin-bottom:10px" onclick="vehSheet('${v.id}')"><div class="qrow"><div class="grow"><div class="k">${v.name} <span class="mini">${v.plate}</span> <span class="pill ${v.serviceStatus==='in-service'?'green':v.serviceStatus==='maintenance'?'gold':'grey'}">${v.serviceStatus}</span></div><div class="mini">${v.type} \u00b7 ${v.make} ${v.model} \u00b7 ${(v.odometer||0).toLocaleString()} km${v.crewName?(' \u00b7 crew '+v.crewName):''}</div></div></div>${v.docFlags.length?`<div class="qrow" style="gap:6px;margin-top:8px;flex-wrap:wrap">${docFlagPills(v.docFlags)}</div>`:''}</div>`).join('')||'<div class="card"><div class="mini">No vehicles.</div></div>'); }
+  else if(FM.tab==='riders'){ el.innerHTML=(FM.riders.map(r=>`<div class="card tap" style="margin-bottom:10px" onclick="riderSheet('${r.userId}')"><div class="qrow"><div class="grow"><div class="k">${r.name} ${fmVerPill(r.verification)}</div><div class="mini">${r.vehicleType||'no vehicle'}${r.plate?(' \u00b7 '+r.plate):''}${r.licenseNo?(' \u00b7 lic '+r.licenseNo):''} \u00b7 ${r.email}</div></div></div>${r.docFlags.length?`<div class="qrow" style="gap:6px;margin-top:8px;flex-wrap:wrap">${docFlagPills(r.docFlags)}</div>`:''}</div>`).join('')||'<div class="card"><div class="mini">No riders. Add one under Staff, then onboard here.</div></div>'); }
+  else { el.innerHTML=(FM.crew.map(c=>`<div class="card tap" style="margin-bottom:10px" onclick="crewSheet('${c.userId}')"><div class="qrow"><div class="grow"><div class="k">${c.name} ${c.cert?`<span class="pill teal">${c.cert}</span>`:'<span class="pill gold">no cert</span>'}</div><div class="mini">${c.licenseNo?('lic '+c.licenseNo):'no licence'} \u00b7 ${c.email}</div></div></div>${c.docFlags.length?`<div class="qrow" style="gap:6px;margin-top:8px;flex-wrap:wrap">${docFlagPills(c.docFlags)}</div>`:''}</div>`).join('')||'<div class="card"><div class="mini">No ambulance crew. Add one under Staff, then set certification here.</div></div>'); }
+}
+function vehSheet(id){ const v=id?FM.veh.find(x=>x.id===id):null;
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">${v?'Vehicle':'Add vehicle'}</div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Name / unit</label><input id="vName" value="${v?v.name:''}" placeholder="Ambulance A9"></div><div class="field grow"><label>Plate</label><input id="vPlate" value="${v?v.plate:''}" placeholder="LAG-000-AM"></div></div>
+  <div class="field"><label>Type</label><select id="vType">${VEH_TYPES.map(t=>`<option ${v&&v.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Make</label><input id="vMake" value="${v?v.make:''}"></div><div class="field grow"><label>Model</label><input id="vModel" value="${v?v.model:''}"></div><div class="field grow"><label>Odometer (km)</label><input id="vOdo" type="number" value="${v?v.odometer:0}"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Registration expiry</label><input id="vReg" type="date" value="${v?v.regExpiry:''}"></div><div class="field grow"><label>Insurance expiry</label><input id="vIns" type="date" value="${v?v.insuranceExpiry:''}"></div></div>
+  <div class="field"><label>Inspection expiry</label><input id="vInsp" type="date" value="${v?v.inspectionExpiry:''}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="saveVeh(${v?`'${v.id}'`:'null'})">${v?'Save':'Add vehicle'}</button>
+  ${v?`<div class="qrow" style="gap:8px;margin-top:10px">${v.serviceStatus!=='maintenance'?`<button class="btn btn-line tap" style="flex:1" onclick="vehStatus('${v.id}','maintenance')">Send to maintenance</button>`:`<button class="btn btn-line tap" style="flex:1" onclick="vehStatus('${v.id}','in-service')">Return to service</button>`}<button class="btn btn-line tap" style="flex:1;color:var(--coral)" onclick="vehStatus('${v.id}','retired')">Retire</button></div>`:''}`); }
+async function saveVeh(id){ const g=x=>document.getElementById(x).value; const body={name:g('vName'),plate:g('vPlate'),type:g('vType'),make:g('vMake'),model:g('vModel'),odometer:Number(g('vOdo'))||0,regExpiry:g('vReg'),insuranceExpiry:g('vIns'),inspectionExpiry:g('vInsp')};
+  try{ await api(id?('/api/admin/fleet/vehicles/'+id):'/api/admin/fleet/vehicles',{method:'POST',body}); closeSheet(); await loadFM(); toast(id?'Saved':'Vehicle added'); }catch(e){ toast(e.message); } }
+async function vehStatus(id,s){ try{ await api('/api/admin/fleet/vehicles/'+id+'/status',{method:'POST',body:{serviceStatus:s}}); closeSheet(); await loadFM(); toast('Vehicle '+s); }catch(e){ toast(e.message); } }
+function riderSheet(id){ const r=FM.riders.find(x=>x.userId===id); if(!r)return;
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:2px">${r.name} ${fmVerPill(r.verification)}</div><div class="mini" style="margin-bottom:10px">Rider onboarding \u00b7 ${r.email}</div>
+  <div class="field"><label>Vehicle type</label><select id="rVeh">${['',...RIDE_TYPES].map(t=>`<option ${r.vehicleType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Plate</label><input id="rPlate" value="${r.plate||''}"></div><div class="field grow"><label>Phone</label><input id="rPhone" value="${r.phone||''}"></div></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Licence no.</label><input id="rLic" value="${r.licenseNo||''}"></div><div class="field grow"><label>Licence expiry</label><input id="rLicExp" type="date" value="${r.licenseExpiry||''}"></div></div>
+  <div class="field"><label>Insurance expiry</label><input id="rIns" type="date" value="${r.insuranceExpiry||''}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="saveRider('${id}')">Save profile</button>
+  <div class="qrow" style="gap:8px;margin-top:10px"><button class="btn btn-line tap" style="flex:1;color:var(--green,#15A88A)" onclick="verifyRider('${id}','verified')">Verify</button><button class="btn btn-line tap" style="flex:1" onclick="verifyRider('${id}','pending')">Set pending</button><button class="btn btn-line tap" style="flex:1;color:var(--coral)" onclick="verifyRider('${id}','rejected')">Reject</button></div>`); }
+async function saveRider(id){ const g=x=>document.getElementById(x).value; const body={vehicleType:g('rVeh'),plate:g('rPlate'),phone:g('rPhone'),licenseNo:g('rLic'),licenseExpiry:g('rLicExp'),insuranceExpiry:g('rIns')};
+  try{ await api('/api/admin/fleet/riders/'+id+'/profile',{method:'POST',body}); await loadFM(); toast('Saved'); }catch(e){ toast(e.message); } }
+async function verifyRider(id,v){ try{ await api('/api/admin/fleet/riders/'+id+'/verify',{method:'POST',body:{verification:v}}); closeSheet(); await loadFM(); toast('Rider '+v); }catch(e){ toast(e.message); } }
+function crewSheet(id){ const c=FM.crew.find(x=>x.userId===id); if(!c)return;
+  openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:2px">${c.name}</div><div class="mini" style="margin-bottom:10px">Ambulance crew \u00b7 ${c.email}</div>
+  <div class="field"><label>Certification</label><select id="cCert">${['',...CERTS].map(t=>`<option ${c.cert===t?'selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="qrow" style="gap:8px"><div class="field grow"><label>Licence no.</label><input id="cLic" value="${c.licenseNo||''}"></div><div class="field grow"><label>Licence expiry</label><input id="cLicExp" type="date" value="${c.licenseExpiry||''}"></div></div>
+  <div class="field"><label>Phone</label><input id="cPhone" value="${c.phone||''}"></div>
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="saveCrew('${id}')">Save</button>`); }
+async function saveCrew(id){ const g=x=>document.getElementById(x).value; try{ await api('/api/admin/fleet/crew/'+id+'/profile',{method:'POST',body:{cert:g('cCert'),licenseNo:g('cLic'),licenseExpiry:g('cLicExp'),phone:g('cPhone')}}); closeSheet(); await loadFM(); toast('Saved'); }catch(e){ toast(e.message); } }
 SCREENS.roster={ body(){ return `<div class="greeting"><div class="hello">Roster & attendance.</div><div class="sub">Assign duties and track punctuality</div></div>
   <div class="card" style="margin-top:14px"><div style="font-weight:700;margin-bottom:10px">Assign a shift</div>
     <select id="rStaff" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);margin-bottom:8px"></select>
