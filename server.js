@@ -699,6 +699,42 @@ app.post('/api/chw/register', auth, roleOnly('chw'), (req, res) => {
   db.patients.push(p); logAudit('CHW', 'client.registered', first + ' ' + last); store.save(); res.json(p);
 });
 app.get('/api/chw/roster', auth, roleOnly('chw'), (req, res) => res.json(db.patients.filter(p => p.registeredBy === req.user.id)));
+
+/* ---- CHW household detail, referrals, immunizations ---- */
+['referrals', 'immunizations'].forEach(k => { if (!db[k]) db[k] = []; });
+function chwOwns(req, patientId) { const p = db.patients.find(x => x.id === patientId); return p && p.registeredBy === req.user.id ? p : null; }
+app.get('/api/chw/household/:id', auth, roleOnly('chw'), (req, res) => {
+  const p = chwOwns(req, req.params.id); if (!p) return res.status(404).json({ error: 'Client not found on your register' });
+  res.json({
+    client: { id: p.id, name: p.first + ' ' + p.last, hn: p.hn, sex: p.sex, dob: p.dob, phone: p.phone, area: p.area, nextVisit: p.nextVisit,
+      conditions: p.conditions || [], anc: p.anc || null },
+    visits: db.visits.filter(v => v.patientId === p.id).slice(-10).reverse(),
+    immunizations: db.immunizations.filter(i => i.patientId === p.id),
+    referrals: db.referrals.filter(r => r.patientId === p.id),
+  });
+});
+app.post('/api/chw/refer', auth, roleOnly('chw'), (req, res) => {
+  const b = req.body || {}; const p = chwOwns(req, b.patientId); if (!p) return res.status(404).json({ error: 'Client not found on your register' });
+  const hid = req.user.hospitalId; const ref = { id: uid('ref'), patientId: p.id, patientName: p.first + ' ' + p.last, reason: (b.reason || 'CHW referral').slice(0, 160),
+    urgency: b.urgency === 'urgent' ? 'urgent' : 'routine', by: (db.users.find(u => u.id === req.user.id) || {}).name || 'CHW', hospitalId: hid, status: 'open', at: Date.now() };
+  db.referrals.unshift(ref);
+  // surface into the hospital: an authorization the front office / payer can see, and a claimable event
+  db.authorizations.push({ id: uid('au'), patientId: p.id, what: (ref.urgency === 'urgent' ? 'URGENT ' : '') + 'Community referral: ' + ref.reason, where: hospitalName(hid) || 'Hospital', status: 'Pending', when: 'now' });
+  p.nextVisit = 'Referred to hospital';
+  logAudit('CHW', 'referral', p.first + ' ' + p.last + (ref.urgency === 'urgent' ? ' (urgent)' : '')); store.save(); res.json(ref);
+});
+app.post('/api/chw/immunization', auth, roleOnly('chw'), (req, res) => {
+  const b = req.body || {}; const p = chwOwns(req, b.patientId); if (!p) return res.status(404).json({ error: 'Client not found on your register' });
+  if (!(b.vaccine || '').trim()) return res.status(400).json({ error: 'Vaccine is required' });
+  const im = { id: uid('imm'), patientId: p.id, vaccine: b.vaccine.trim(), dose: b.dose || '', date: b.date || new Date().toISOString().slice(0, 10), by: (db.users.find(u => u.id === req.user.id) || {}).name || 'CHW', at: Date.now() };
+  db.immunizations.push(im); logAudit('CHW', 'immunization', p.first + ' ' + p.last + ' ' + im.vaccine); store.save(); res.json(im);
+});
+app.post('/api/chw/anc', auth, roleOnly('chw'), (req, res) => {
+  const b = req.body || {}; const p = chwOwns(req, b.patientId); if (!p) return res.status(404).json({ error: 'Client not found on your register' });
+  p.anc = { weeks: parseInt(b.weeks, 10) || (p.anc && p.anc.weeks) || 0, visits: ((p.anc && p.anc.visits) || 0) + 1, lastBp: b.bp || '', updatedAt: Date.now() };
+  db.visits.push({ id: uid('v'), patientId: p.id, reason: 'Antenatal check (' + p.anc.weeks + ' weeks)' + (b.bp ? ' BP ' + b.bp : ''), doctor: (db.users.find(u => u.id === req.user.id) || {}).name || 'CHW', when: 'just now' });
+  logAudit('CHW', 'anc.visit', p.first + ' ' + p.last); store.save(); res.json(p.anc);
+});
 app.post('/api/chw/visit', auth, roleOnly('chw'), (req, res) => {
   const { patientId, note, danger } = req.body || {};
   const p = db.patients.find(x => x.id === patientId); if (!p) return res.status(404).json({ error: 'Client not found' });
@@ -1020,6 +1056,9 @@ app.post('/api/doc/threads/:id/message', auth, doctorOnly, async (req, res) => {
  * Owns the canonical order routes for doctor / lab / pharmacy / patient.
  * ============================================================ */
 require('./spine')(app, { db, store, uid, auth, doctorOnly, roleOnly, pname, myDoctor, X, logAudit });
+require('./inventory')(app, { db, store, uid, auth, roleOnly, logAudit });
+require('./fleet')(app, { db, store, uid, auth, roleOnly, logAudit, hospitalById });
+require('./labcat')(app, { db, store, uid, auth, roleOnly, logAudit });
 
 /* ============================================================
  * EMERGENCY DISPATCH (CAD) + AVL. Uses the spine event bus for

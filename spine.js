@@ -168,10 +168,11 @@ module.exports = function mountSpine(app, ctx) {
   app.post('/api/lab/orders/:id/result', auth, roleOnly('lab'), async (req, res) => {
     const o = orderById(req.params.id); if (!o || o.type !== 'lab') return res.status(404).json({ error: 'Order not found' });
     if (o.hospitalId !== myHid(req)) return res.status(403).json({ error: 'Not your hospital' });
-    const rows = (req.body && req.body.results) || [];
+    let rows = (req.body && req.body.results) || [];
     if (!rows.length) return res.status(400).json({ error: 'Enter at least one result value' });
+    rows = rows.map(r => { const f = app.locals.labFlag ? app.locals.labFlag(myHid(req), r.test, r.value) : {}; return Object.assign({}, r, { flag: r.flag || f.flag || 'normal', low: (r.low != null ? r.low : f.low), high: (r.high != null ? r.high : f.high), unit: r.unit || f.unit || '', refText: f.refText || r.refText || '' }); });
     o.result = rows;
-    rows.forEach(r => db.results.push({ id: uid('r'), patientId: o.patientId, test: r.test, value: r.value, unit: r.unit || '', flag: r.flag || 'normal', low: r.low, high: r.high, cl: r.cl, ch: r.ch, when: 'just now' }));
+    rows.forEach(r => db.results.push({ id: uid('r'), patientId: o.patientId, test: r.test, value: r.value, unit: r.unit || '', flag: r.flag || 'normal', low: r.low, high: r.high, when: 'just now' }));
     setStatus(o, 'resulted', 'Lab', rows.length + ' result(s) posted');
     emit('order.resulted', { order: o });
     setStatus(o, 'closed', 'Lab', 'order complete');
@@ -216,9 +217,8 @@ module.exports = function mountSpine(app, ctx) {
     if (o.hospitalId !== myHid(req)) return res.status(403).json({ error: 'Not your hospital' });
     o.dueAt = Date.now() + PICKUP_WINDOW_MS; o.missedFlagged = false;
     setStatus(o, 'ready', 'Pharmacy', 'dispensed, ready for pickup');
-    // decrement stock if we can match the drug
-    const item = db.inventory.find(i => i.facility === staffFacility(req) && (o.detail.drug || '').toLowerCase().startsWith(i.name.toLowerCase().split(' ')[0]));
-    if (item && item.stock > 0) item.stock -= 1;
+    // decrement real inventory (FEFO, by dispensed quantity) if the item exists
+    try { if (app.locals.invDispenseByName) { const qty = (o.items && o.items[0] && o.items[0].qty) || 1; app.locals.invDispenseByName(myHid(req), req, o.detail.drug || '', qty, o.id); } } catch (e) {}
     emit('order.ready', { order: o });
     logAudit('Pharmacy', 'rx.ready', orderLabel(o)); store.save(); res.json(forStaff(o));
   });
@@ -239,7 +239,7 @@ module.exports = function mountSpine(app, ctx) {
     const o = orderById(req.params.id); if (!o || o.type !== 'rx') return res.status(404).json({ error: 'Order not found' });
     if (o.hospitalId !== myHid(req)) return res.status(403).json({ error: 'Not your hospital' });
     let items = (req.body && req.body.items) || null;
-    if (!items) { const nm = o.detail.drug || 'Medication'; const inv = db.inventory.find(i => (nm.toLowerCase().startsWith((i.name || '').toLowerCase().split(' ')[0]))); items = [{ name: nm, qty: 1, price: inv ? inv.price : 2500 }]; }
+    if (!items) { const nm = o.detail.drug || 'Medication'; const pr = app.locals.invPriceByName ? app.locals.invPriceByName(myHid(req), nm) : null; items = [{ name: nm, qty: 1, price: pr && pr.price ? pr.price : 2500 }]; }
     items = items.map(it => ({ name: (it.name || 'Item').toString().slice(0, 80), qty: Math.max(1, parseInt(it.qty, 10) || 1), price: Math.max(0, Math.round(Number(it.price) || 0)) }));
     o.items = items; o.drugTotal = items.reduce((s, it) => s + it.price * it.qty, 0);
     setStatus(o, 'priced', 'Pharmacy', 'priced, awaiting patient payment & collection choice');
@@ -247,9 +247,8 @@ module.exports = function mountSpine(app, ctx) {
     logAudit('Pharmacy', 'rx.priced', orderLabel(o) + ' ' + ngn(o.drugTotal)); store.save(); res.json(forStaff(o));
   });
   app.get('/api/pharm/price-suggest', auth, roleOnly('pharmacy'), (req, res) => {
-    const nm = (req.query.drug || '').toLowerCase();
-    const inv = db.inventory.find(i => nm && nm.startsWith((i.name || '').toLowerCase().split(' ')[0]));
-    res.json({ price: inv ? inv.price : null, unit: inv ? inv.unit : null, inStock: inv ? inv.stock : null });
+    const p = app.locals.invPriceByName ? app.locals.invPriceByName(myHid(req), req.query.drug || '') : null;
+    res.json(p || { price: null, unit: null, inStock: null });
   });
   app.post('/api/pharm/orders/:id/remind', auth, roleOnly('pharmacy'), (req, res) => {
     const o = orderById(req.params.id); if (!o || o.type !== 'rx') return res.status(404).json({ error: 'Order not found' });
@@ -308,6 +307,7 @@ module.exports = function mountSpine(app, ctx) {
     db.deliveries = db.deliveries || [];
     const d = db.deliveries.find(x => x.id === req.params.id && x.hospitalId === req.user.hospitalId);
     if (!d) return res.status(404).json({ error: 'Delivery not found' });
+    if (app.locals.riderVerified && !app.locals.riderVerified(req.user.id)) return res.status(403).json({ error: 'Your rider onboarding is not verified yet. Ask your hospital admin.' });
     if (d.assignedRiderId && d.assignedRiderId !== req.user.id) return res.status(409).json({ error: 'Already accepted by another rider' });
     d.assignedRiderId = req.user.id; store.save();
     res.json({ ok: true });

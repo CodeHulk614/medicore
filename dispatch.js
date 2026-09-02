@@ -234,8 +234,8 @@ module.exports = function mountDispatch(app, ctx) {
     const c = caseById(req.params.id); if (!c) return res.status(404).json({ error: 'Case not found' });
     if (c.hospitalId !== myHid(req)) return res.status(403).json({ error: 'That case belongs to another hospital' });
     if (c.responderId) return res.status(400).json({ error: 'Already assigned' });
-    let u = (req.body && req.body.responderId) ? db.responders.find(x => x.id === req.body.responderId && x.hospitalId === c.hospitalId && x.status === 'available') : null;
-    if (!u) { const avail = db.responders.filter(x => x.hospitalId === c.hospitalId && x.status === 'available'); if (!avail.length) return res.status(400).json({ error: 'No units available at ' + ((hospital(c.hospitalId) || {}).name || 'this hospital') }); avail.sort((a, b) => haversineKm(a, c) - haversineKm(b, c)); u = avail[0]; }
+    let u = (req.body && req.body.responderId) ? db.responders.find(x => x.id === req.body.responderId && x.hospitalId === c.hospitalId && x.status === 'available' && (x.serviceStatus || 'in-service') === 'in-service') : null;
+    if (!u) { const avail = db.responders.filter(x => x.hospitalId === c.hospitalId && x.status === 'available' && (x.serviceStatus || 'in-service') === 'in-service'); if (!avail.length) return res.status(400).json({ error: 'No units available at ' + ((hospital(c.hospitalId) || {}).name || 'this hospital') }); avail.sort((a, b) => haversineKm(a, c) - haversineKm(b, c)); u = avail[0]; }
     u.status = 'enroute'; u.assignedCase = c.id; u.onsceneSince = null; u.athospitalSince = null; setDestination(u, { lat: c.lat, lng: c.lng });
     c.responderId = u.id; stamp(c, 'enroute', u.name + ' dispatched, en route');
     notifyHospital(c.hospitalId, 'emergency', u.name + ' dispatched to ' + c.kind + ' at ' + c.area + '. Prepare to receive.');
@@ -249,7 +249,7 @@ module.exports = function mountDispatch(app, ctx) {
   app.post('/api/crew/clockout', auth, roleOnly('crew'), (req, res) => { db.responders.forEach(r => { if (r.crewUserId === req.user.id) r.crewUserId = null; }); store.save(); res.json({ ok: true }); });
   app.get('/api/crew/me', auth, roleOnly('crew'), (req, res) => {
     const u = db.responders.find(r => r.crewUserId === req.user.id);
-    const fleet = db.responders.filter(r => r.hospitalId === req.user.hospitalId && (!r.crewUserId || r.crewUserId === req.user.id)).map(unitView);
+    const fleet = db.responders.filter(r => r.hospitalId === req.user.hospitalId && (r.serviceStatus || 'in-service') === 'in-service' && (!r.crewUserId || r.crewUserId === req.user.id)).map(unitView);
     if (!u) return res.json({ unit: null, fleet });
     const c = u.assignedCase ? caseById(u.assignedCase) : null;
     res.json({ unit: unitView(u), case: c ? caseView(c) : null, chat: (c && c.chat) || [], fleet, pickup: c ? { lat: c.lat, lng: c.lng } : null, hospitalPt: c ? hospCoords(c.hospitalId) : null, hospitals: (db.hospitals || []).filter(h => h.id === req.user.hospitalId).map(h => ({ id: h.id, name: h.name })), bounds: c ? mapBounds([{ lat: c.lat, lng: c.lng }, hospCoords(c.hospitalId), { lat: u.lat, lng: u.lng }]) : null });

@@ -192,6 +192,7 @@ function seed(force) {
       subscription: { tier: 'clinic', status: 'active', since: Date.now() - 60*86400000 },
       modules: { marketplace: true, pharmacy: true, lab: true, ambulance: false, chw: false, analytics: true, wearables: true } },
   ];
+  try { require('./inventory').seed(db, uid); } catch (e) {}
   const DOCH = { doc_tunde: 'h_grand', doc_bisi: 'h_grand', doc_ifeoma: 'h_grand', doc_musa: 'h_grand', doc_yakubu: 'h_grand', doc_ada: 'h_river', doc_chidinma: 'h_river', doc_okon: 'h_river', doc_kunle: 'h_grand', doc_halima: 'h_river' };
   db.doctors.forEach(d => { d.hospitalId = DOCH[d.id] || 'h_grand'; });
   db.users.forEach(u => {
@@ -368,6 +369,8 @@ function seed(force) {
     );
   })();
 
+  try { require('./fleet').seed(db, uid); } catch (e) {}
+  try { require('./labcat').seed(db, uid); } catch (e) {}
   store.save();
   return db;
 }
