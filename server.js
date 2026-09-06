@@ -693,9 +693,9 @@ app.post('/api/rider/deliveries/:id/advance', auth, roleOnly('rider'), async (re
  * COMMUNITY HEALTH WORKER (field, offline-first client)
  * ============================================================ */
 app.post('/api/chw/register', auth, roleOnly('chw'), (req, res) => {
-  const { first, last, phone, area, sex, dob } = req.body || {};
+  const { first, last, phone, area, sex, dob, homeLat, homeLng } = req.body || {};
   if (!first || !last) return res.status(400).json({ error: 'Client name is required' });
-  const p = { id: uid('p'), first, last, hn: 'CH-' + Math.floor(100000 + Math.random() * 900000), member: '', dob: dob || '', sex: sex || '', bg: '', phone: phone || '', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [], registeredBy: req.user.id, area: area || '', nextVisit: 'First visit due' };
+  const p = { id: uid('p'), first, last, hn: 'CH-' + Math.floor(100000 + Math.random() * 900000), member: '', dob: dob || '', sex: sex || '', bg: '', phone: phone || '', plan: 'Self-pay', tier: 'Community', hmo: '', allergies: [], conditions: [], registeredBy: req.user.id, area: area || '', homeLat: (homeLat!=null?homeLat:null), homeLng: (homeLng!=null?homeLng:null), nextVisit: 'First visit due' };
   db.patients.push(p); logAudit('CHW', 'client.registered', first + ' ' + last); store.save(); res.json(p);
 });
 app.get('/api/chw/roster', auth, roleOnly('chw'), (req, res) => res.json(db.patients.filter(p => p.registeredBy === req.user.id)));

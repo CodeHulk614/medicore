@@ -128,7 +128,7 @@ module.exports = function mountFrontOffice(app, ctx) {
   app.post('/api/frontdesk/register', auth, requirePerm('patient.register'), (req, res) => {
     const b = req.body || {}; if (!b.first || !b.last) return res.status(400).json({ error: 'First and last name are required' });
     const hid = myHid(req);
-    const p = { id: uid('p'), first: b.first, last: b.last, hn: 'GH-' + Math.floor(100000 + Math.random() * 900000), member: b.member || '', dob: b.dob || '', sex: b.sex || '', bg: '', phone: b.phone || '', plan: b.plan || 'Self-pay', tier: b.tier || 'Standard', hmo: b.hmo || '', address: b.address || '', area: b.area || '', allergies: [], conditions: [], hospitalId: hid, registeredBy: req.user.id };
+    const p = { id: uid('p'), first: b.first, last: b.last, hn: 'GH-' + Math.floor(100000 + Math.random() * 900000), member: b.member || '', dob: b.dob || '', sex: b.sex || '', bg: '', phone: b.phone || '', plan: b.plan || 'Self-pay', tier: b.tier || 'Standard', hmo: b.hmo || '', address: b.address || '', area: b.area || '', homeLat: (b.homeLat!=null?b.homeLat:null), homeLng: (b.homeLng!=null?b.homeLng:null), allergies: [], conditions: [], hospitalId: hid, registeredBy: req.user.id };
     db.patients.push(p); logAudit(req.staff.name, 'patient.registered', p.first + ' ' + p.last); store.save();
     res.json(pFull(p));
   });
