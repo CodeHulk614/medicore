@@ -141,12 +141,13 @@ module.exports = function mountDispatch(app, ctx) {
     const p = db.patients.find(x => x.id === req.user.patientId) || {}; const b = req.body || {};
     const allowed = p.hospitalId ? [p.hospitalId] : [];
     let hid = b.hospitalId; if (hid && !allowed.includes(hid)) return res.status(403).json({ error: 'You are not registered with that hospital' });
-    let lat = b.lat, lng = b.lng, address = b.address;
-    if (lat == null || lng == null) { lat = p.homeLat; lng = p.homeLng; address = p.address; }
+    let lat = b.lat, lng = b.lng, address = b.address, area;
+    if (lat == null || lng == null) { lat = p.homeLat; lng = p.homeLng; address = p.address; area = p.area; }
+    else { area = (address && address.split(',')[0].trim()) || p.area || 'Pickup location'; }
     if (lat == null || lng == null) { const hc = hospCoords(allowed[0]); lat = (hc || {}).lat || 6.505; lng = (hc || {}).lng || 3.36; }
     if (!hid) hid = nearestHospitalId({ lat, lng }, allowed);
     if (!hid) return res.status(400).json({ error: 'No hospital available to dispatch from' });
-    const e = newCase({ kind: b.kind || 'Medical emergency', area: p.area || 'your area', name: (p.first || '') + ' ' + (p.last || ''), phone: p.phone, patientId: p.id, lat, lng, address, priority: 'high', source: 'patient app', hospitalId: hid });
+    const e = newCase({ kind: b.kind || 'Medical emergency', area: area || p.area || 'Unknown', name: (p.first || '') + ' ' + (p.last || ''), phone: p.phone, patientId: p.id, lat, lng, address, priority: 'high', source: 'patient app', hospitalId: hid });
     res.json({ case: caseView(e) });
   });
 
