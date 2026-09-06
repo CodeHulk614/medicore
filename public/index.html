@@ -678,7 +678,22 @@ function initDlvPicker(){ const el=document.getElementById('dlvMap'); if(!el||ty
 function onDlvSearch(q){ clearTimeout(dlvSearchTimer); const box=document.getElementById('dlvSuggest'); if(!q||q.trim().length<3){ if(box)box.innerHTML=''; return; } dlvSearchTimer=setTimeout(async()=>{ const res=await geoSearch(q.trim()); if(!box)return; if(!res.length){ box.innerHTML='<div class="mini" style="padding:8px;color:var(--faint)">No matches (address search needs internet). You can still drop the pin on the map.</div>'; return; } box.innerHTML=res.map((r,i)=>`<button class="btn btn-line tap" style="display:block;width:100%;text-align:left;margin-top:6px;font-size:.86rem;padding:10px" onclick="pickDlvSuggest(${i})">${(r.display_name||'').replace(/"/g,'&quot;')}</button>`).join(''); window.__dlvRes=res; },500); }
 function pickDlvSuggest(i){ const r=(window.__dlvRes||[])[i]; if(!r)return; DADDR.lat=parseFloat(r.lat); DADDR.lng=parseFloat(r.lon); DADDR.text=r.display_name||''; const t=document.getElementById('dlvAddrText'); if(t)t.value=DADDR.text; const s=document.getElementById('dlvSearch'); if(s)s.value=DADDR.text; const b=document.getElementById('dlvSuggest'); if(b)b.innerHTML=''; if(dlvPicker&&dlvPicker.setCenter)dlvPicker.setCenter(DADDR.lat,DADDR.lng); }
 function useDlvLocation(){ if(!navigator.geolocation){ toast('Location not available on this device'); return; } toast('Finding your location\u2026'); navigator.geolocation.getCurrentPosition(async(pos)=>{ DADDR.lat=pos.coords.latitude; DADDR.lng=pos.coords.longitude; if(dlvPicker&&dlvPicker.setCenter)dlvPicker.setCenter(DADDR.lat,DADDR.lng); const name=await geoReverse(DADDR.lat,DADDR.lng); if(name){ DADDR.text=name; const t=document.getElementById('dlvAddrText'); if(t)t.value=name; } toast('Location set'); }, ()=>toast('Could not get your location'), {enableHighAccuracy:true,timeout:8000}); }
-async function geoSearch(q){ try{ const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ng&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}}); if(!r.ok)return[]; return await r.json(); }catch(e){ return []; } }
+function biasPoint(){ try{ if(typeof ME!=='undefined'&&ME&&ME.homeLat!=null) return {lat:ME.homeLat,lng:ME.homeLng}; }catch(e){} return {lat:6.5244,lng:3.3792}; }
+async function geoSearch(q){
+  const b=biasPoint();
+  // Photon is built for autocomplete and biases results around the given point
+  try{
+    const url='https://photon.komoot.io/api/?limit=8&lang=en&lat='+b.lat+'&lon='+b.lng+'&q='+encodeURIComponent(q);
+    const r=await fetch(url); if(r.ok){ const j=await r.json();
+      const feats=(j.features||[]).map(f=>{ const p=f.properties||{}; const c=(f.geometry||{}).coordinates||[];
+        const parts=[p.name,(p.street&&p.street!==p.name)?p.street:null,p.housenumber,p.suburb||p.district,p.city||p.town||p.village,p.state,p.country].filter(Boolean);
+        return { display_name:[...new Set(parts)].join(', '), lat:c[1], lon:c[0] }; }).filter(x=>x.lat!=null && x.display_name);
+      if(feats.length) return feats; }
+  }catch(e){}
+  // fallback: Nominatim (Nigeria), with address details
+  try{ const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&countrycodes=ng&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}}); if(r.ok){ const j=await r.json(); return j.map(x=>({display_name:x.display_name,lat:x.lat,lon:x.lon})); } }catch(e){}
+  return [];
+}
 async function geoReverse(lat,lng){ try{ const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+lat+'&lon='+lng,{headers:{'Accept':'application/json'}}); if(!r.ok)return null; const j=await r.json(); return j.display_name||null; }catch(e){ return null; } }
 async function confirmAddr(id){ const address=((document.getElementById('dlvAddrText')||{}).value||DADDR.text||'').trim(); if(!address){ toast('Enter or pick a delivery address'); return; } await doPayRx(id,'deliver',{address,lat:DADDR.lat,lng:DADDR.lng}); }
 async function doPayRx(id,fulfilment,addr){ const address=fulfilment==='deliver'?((addr&&addr.address)||((document.getElementById('rxAddr')||{}).value||'').trim()):null;
@@ -726,28 +741,40 @@ function trackBannerHTML(){ const tk=DATA.track; if(!tk||!tk.active) return ''; 
   return `<button class="card tap" style="width:100%;border:none;text-align:left;background:var(--teal);color:#fff;margin:2px 0 10px" onclick="go('track')"><div class="row"><div class="avatar sm" style="background:rgba(255,255,255,.2);color:#fff">${svg(I.truck,20)}</div><div class="grow"><div class="k" style="color:#fff">Ambulance ${st}${eta}</div><div style="font-size:.8rem;opacity:.92">Tap to track live on the map</div></div></div></button>`; }
 
 // ---- SOS: choose which registered hospital + the pickup point ----
-let SOS={hosp:null,pickup:'home',lat:null,lng:null};
+let SOS={hosp:null,pickup:'home',lat:null,lng:null,text:''};
 async function sosConfirm(){ let hosps=[]; try{ hosps=await api('/api/patient/hospitals'); }catch(e){}
-  SOS={hosp:(hosps[0]||{}).id||null,pickup:'home',lat:null,lng:null};
+  SOS={hosp:(hosps[0]||{}).id||null,pickup:'home',lat:null,lng:null,text:''};
   openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:6px">Call an ambulance</div><p class="muted" style="font-size:.86rem;margin:0 0 12px">An ambulance from the hospital you choose will be dispatched. Only use this for a real emergency.</p>
   <div class="field"><label>What is happening?</label><select id="sosKind"><option>Medical emergency</option><option>Chest pain</option><option>Difficulty breathing</option><option>Serious injury / accident</option><option>Labour / obstetric</option></select></div>
   <div class="field"><label>Which hospital?</label><select id="sosHosp">${hosps.map(h=>`<option value="${h.id}">${h.name} \u00b7 ${h.area||''}</option>`).join('')||'<option>No registered hospital</option>'}</select></div>
   <div class="field"><label>Pickup location</label>
-    <button class="btn btn-line btn-block tap" id="pkHome" onclick="setPickup('home')" style="margin-bottom:8px">${svg(I.home||I.pin,17)} My home address${ME.address?` (${ME.address})`:''}</button>
-    <button class="btn btn-line btn-block tap" id="pkGps" onclick="setPickup('gps')">${svg(I.pin,17)} Use my current location</button>
-    <div class="mini" id="pkNote" style="margin-top:6px;color:var(--faint)">Using your saved home address.</div>
+    <div class="qrow" style="gap:8px;margin-bottom:8px"><button class="btn btn-line tap" id="pkHome" style="flex:1" onclick="setPickup('home')">${svg(I.home||I.pin,16)} Home</button><button class="btn btn-line tap" id="pkGps" style="flex:1" onclick="setPickup('gps')">${svg(I.pin,16)} Current location</button></div>
+    <input id="sosSearch" autocomplete="off" placeholder="or type a street, area or landmark\u2026" oninput="onSosSearch(this.value)" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font-size:.92rem">
+    <div id="sosSuggest" style="margin-top:4px"></div>
+    <div id="sosMap" data-keep style="height:150px;border-radius:10px;overflow:hidden;margin-top:8px"></div>
+    <div class="mini" id="pkNote" style="margin-top:8px"><b>Pickup:</b> <span id="pkAddr">${ME.address?ME.address.replace(/</g,'&lt;'):'your saved home address'}</span></div>
   </div>
   <button class="btn btn-block btn-lg tap" style="background:var(--coral);color:#fff" onclick="sendSOS()">Call ambulance now</button>`);
+  setPickup('home'); initSosPicker();
 }
-function setPickup(kind){ SOS.pickup=kind; const note=$('pkNote'); const home=$('pkHome'), gps=$('pkGps');
-  if(home)home.style.borderColor=kind==='home'?'var(--coral)':'var(--line)'; if(gps)gps.style.borderColor=kind==='gps'?'var(--coral)':'var(--line)';
-  if(kind==='home'){ SOS.lat=null; SOS.lng=null; if(note)note.textContent='Using your saved home address.'; return; }
-  if(note)note.textContent='Getting your current location...';
-  if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(p=>{ SOS.lat=p.coords.latitude; SOS.lng=p.coords.longitude; if(note)note.textContent='Current location locked in.'; }, ()=>{ if(note)note.textContent='Could not get GPS; will use your home address instead.'; SOS.pickup='home'; SOS.lat=null; SOS.lng=null; }); }
-  else { if(note)note.textContent='This device has no GPS; using home address.'; SOS.pickup='home'; }
+let sosPicker=null, sosPickerEl=null, sosSearchTimer=null;
+function initSosPicker(){ const el=document.getElementById('sosMap'); if(!el||typeof MapKit==='undefined')return; const start={lat:(ME.homeLat!=null?ME.homeLat:6.5244),lng:(ME.homeLng!=null?ME.homeLng:3.3792)};
+  if(sosPicker&&sosPicker.destroy)sosPicker.destroy(); sosPicker=MapKit.createPicker(el,{start,onPick:async(p)=>{ SOS.pickup='pin'; SOS.lat=p.lat; SOS.lng=p.lng; setSelBtns(); const t=document.getElementById('pkAddr'); if(t)t.textContent='Locating\u2026'; const name=await geoReverse(p.lat,p.lng); SOS.text=name||''; if(t)t.textContent=name||(p.lat.toFixed(4)+', '+p.lng.toFixed(4)); }}); sosPickerEl=el; }
+function setSelBtns(){ const home=$('pkHome'), gps=$('pkGps'); if(home)home.style.borderColor=SOS.pickup==='home'?'var(--coral)':'var(--line)'; if(gps)gps.style.borderColor=SOS.pickup==='gps'?'var(--coral)':'var(--line)'; }
+function onSosSearch(q){ clearTimeout(sosSearchTimer); const box=document.getElementById('sosSuggest'); if(!q||q.trim().length<3){ if(box)box.innerHTML=''; return; }
+  sosSearchTimer=setTimeout(async()=>{ const res=await geoSearch(q.trim()); if(!box)return; if(!res.length){ box.innerHTML='<div class="mini" style="padding:8px;color:var(--faint)">No matches yet. You can also drop the pin on the map.</div>'; return; }
+    box.innerHTML=res.map((r,i)=>`<button class="btn btn-line tap" style="display:block;width:100%;text-align:left;margin-top:6px;font-size:.86rem;padding:10px" onclick="pickSosSuggest(${i})">${(r.display_name||'').replace(/"/g,'&quot;')}</button>`).join(''); window.__sosRes=res; },450); }
+function pickSosSuggest(i){ const r=(window.__sosRes||[])[i]; if(!r)return; SOS.pickup='search'; SOS.lat=parseFloat(r.lat); SOS.lng=parseFloat(r.lon); SOS.text=r.display_name||''; setSelBtns();
+  const t=document.getElementById('pkAddr'); if(t)t.textContent=SOS.text; const s=document.getElementById('sosSearch'); if(s)s.value=SOS.text; const box=document.getElementById('sosSuggest'); if(box)box.innerHTML=''; if(sosPicker&&sosPicker.setCenter)sosPicker.setCenter(SOS.lat,SOS.lng); }
+function setPickup(kind){ SOS.pickup=kind; SOS.text=''; setSelBtns(); const addr=$('pkAddr');
+  if(kind==='home'){ SOS.lat=null; SOS.lng=null; if(addr)addr.textContent=(ME.address||'your saved home address'); if(sosPicker&&sosPicker.setCenter&&ME.homeLat!=null)sosPicker.setCenter(ME.homeLat,ME.homeLng); return; }
+  if(kind==='gps'){ if(addr)addr.textContent='Getting your current location\u2026';
+    if(!navigator.geolocation){ if(addr)addr.textContent='This device has no GPS \u2014 using home address.'; SOS.pickup='home'; setSelBtns(); return; }
+    navigator.geolocation.getCurrentPosition(async p=>{ SOS.lat=p.coords.latitude; SOS.lng=p.coords.longitude; if(sosPicker&&sosPicker.setCenter)sosPicker.setCenter(SOS.lat,SOS.lng); const name=await geoReverse(SOS.lat,SOS.lng); SOS.text=name||''; if(addr)addr.textContent=name||(SOS.lat.toFixed(4)+', '+SOS.lng.toFixed(4)); },
+      ()=>{ if(addr)addr.textContent='Could not get GPS \u2014 using home address.'; SOS.pickup='home'; SOS.lat=null; SOS.lng=null; setSelBtns(); }, {enableHighAccuracy:true,timeout:9000}); }
 }
 async function sendSOS(){ const kind=($('sosKind')||{}).value||'Medical emergency'; const hosp=($('sosHosp')||{}).value||SOS.hosp;
-  const body={kind,hospitalId:hosp}; if(SOS.pickup==='gps'&&SOS.lat!=null){ body.lat=SOS.lat; body.lng=SOS.lng; }
+  const body={kind,hospitalId:hosp}; if(SOS.pickup!=='home'&&SOS.lat!=null){ body.lat=SOS.lat; body.lng=SOS.lng; if(SOS.text)body.address=SOS.text; }
   try{ await api('/api/patient/sos',{method:'POST',body}); closeSheet(); DATA.track=await api('/api/patient/track'); toast('Ambulance requested. Track it live.'); go('track'); }catch(e){ toast(e.message); } }
 
 // ---- live tracking screen ----

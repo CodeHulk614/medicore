@@ -348,6 +348,7 @@ svg{max-width:100%}
 <script src="/clockkit.js"></script>
 <script src="/mapkit.js"></script>
 <script src="/refresh.js"></script>
+<script src="/geokit.js"></script>
 <script>
 'use strict';
 const I = {
@@ -613,8 +614,9 @@ function addPatientSheet(){ openSheet(`<div class="grab"></div><div style="font-
   <div class="field"><label>Address</label><input id="paAddr"></div>
   <div class="mini" style="margin:2px 0 8px">Optional login:</div>
   <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>Email</label><input id="paEmail" inputmode="email"></div><div class="field" style="flex:1"><label>Temp password</label><input id="paPass"></div></div>
-  <button class="btn btn-primary btn-block btn-lg tap" onclick="createPatient()">Register</button>`); }
-async function createPatient(){ const plan=$('paPlan').value; const body={first:$('paF').value.trim(),last:$('paL').value.trim(),phone:$('paPhone').value.trim(),sex:$('paSex').value,plan,hmo:/HMO/.test(plan)?plan:'',address:$('paAddr').value.trim(),email:$('paEmail').value.trim(),tempPassword:$('paPass').value.trim()};
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="createPatient()">Register</button>`);
+  window.__paLoc=null; try{ MediGeo.mountAutocomplete(document.getElementById("paAddr"), p=>{ window.__paLoc=p; }); }catch(e){} }
+async function createPatient(){ const plan=$('paPlan').value; const loc=window.__paLoc||{}; const body={first:$('paF').value.trim(),last:$('paL').value.trim(),phone:$('paPhone').value.trim(),sex:$('paSex').value,plan,hmo:/HMO/.test(plan)?plan:'',address:$('paAddr').value.trim(),homeLat:loc.lat,homeLng:loc.lng,email:$('paEmail').value.trim(),tempPassword:$('paPass').value.trim()};
   try{ await api('/api/admin/patients',{method:'POST',body}); closeSheet(); await loadPats(); toast('Patient registered'); }catch(e){ toast(e.message); } }
 function editPatientSheet(id){ const p=PATS.find(x=>x.id===id); if(!p)return; openSheet(`<div class="grab"></div><div style="font-weight:700;font-size:1.1rem;margin-bottom:10px">Edit ${p.name}</div>
   <div class="qrow" style="gap:8px"><div class="field" style="flex:1"><label>First</label><input id="epF" value="${(p.first||'').replace(/"/g,'&quot;')}"></div><div class="field" style="flex:1"><label>Last</label><input id="epL" value="${(p.last||'').replace(/"/g,'&quot;')}"></div></div>

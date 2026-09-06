@@ -346,6 +346,7 @@ input{font-family:inherit}
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
 <script src="/plangate.js"></script>
+<script src="/geokit.js"></script>
 <script>
 'use strict';
 const I = {
@@ -461,10 +462,12 @@ function caseCard(c){ const st=CST[c.status]||['grey',c.status]; const u=DATA.re
 function logCall(){ openSheet(`<div class="grab"></div><div class="k" style="font-size:1.1rem;margin-bottom:12px">Log incoming call</div>
   <div class="field"><label>Emergency type</label><select id="emKind"><option>Road accident</option><option>Chest pain</option><option>Labour / obstetric</option><option>Trauma / fall</option><option>Difficulty breathing</option><option>Other medical</option></select></div>
   <div class="field"><label>Area</label><input id="emArea" placeholder="e.g. Surulere"></div>
+  <div class="field"><label>Address / landmark</label><input id="emAddr" placeholder="Search street, area or landmark\u2026"></div>
   <div class="field"><label>Caller name (optional)</label><input id="emName" placeholder="Name"></div>
-  <button class="btn btn-primary btn-block btn-lg tap" onclick="createCase()">Create case</button>`); }
-async function createCase(){ const kind=$('emKind').value, area=$('emArea').value.trim()||'Unknown', name=$('emName').value.trim();
-  try{ await api('/api/emergency',{method:'POST',body:{kind,area,name}}); await load(); closeSheet(); switchTab('cases'); toast('Case created'); }catch(e){ toast(e.message); } }
+  <button class="btn btn-primary btn-block btn-lg tap" onclick="createCase()">Create case</button>`);
+  window.__emLoc=null; try{ MediGeo.mountAutocomplete(document.getElementById("emAddr"), p=>{ window.__emLoc=p; const a=document.getElementById("emArea"); if(a&&!a.value) a.value=(p.text||"").split(",")[0]; }); }catch(e){} }
+async function createCase(){ const kind=$('emKind').value, area=$('emArea').value.trim()||'Unknown', name=$('emName').value.trim(); const loc=window.__emLoc||{}; const body={kind,area,name}; if(loc.lat!=null){ body.lat=loc.lat; body.lng=loc.lng; body.address=loc.text; }
+  try{ await api('/api/emergency',{method:'POST',body}); window.__emLoc=null; await load(); closeSheet(); switchTab('cases'); toast('Case created'); }catch(e){ toast(e.message); } }
 async function assign(id){ try{ await api('/api/dispatch/cases/'+id+'/assign',{method:'POST',body:{}}); await load(); paintDisp(); toast('Nearest unit dispatched, hospital alerted'); }catch(e){ toast(e.message); } }
 async function assignUnit(id,unitId){ try{ await api('/api/dispatch/cases/'+id+'/assign',{method:'POST',body:{responderId:unitId}}); await load(); closeSheet&&closeSheet(); paintDisp(); toast('Unit dispatched, hospital alerted'); }catch(e){ toast(e.message); } }
 async function act(id,action){ try{ await api('/api/dispatch/cases/'+id+'/'+action,{method:'POST',body:{}}); await load(); paintDisp(); toast('Case updated'); }catch(e){ toast(e.message); } }

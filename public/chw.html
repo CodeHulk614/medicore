@@ -345,6 +345,7 @@ input{font-family:inherit}
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
 <script src="/plangate.js"></script>
+<script src="/geokit.js"></script>
 <script>
 'use strict';
 const I = {
@@ -470,7 +471,7 @@ async function recordImm(id){ const vaccine=($('imVac').value||'').trim(); if(!v
   try{ await api('/api/chw/immunization',{method:'POST',body:{patientId:id,vaccine,dose}}); toast(vaccine+' recorded'); openClient(id); }catch(e){ toast(e.message); } }
 async function ancUpdate(id){ const weeks=($('ancW').value||''), bp=($('ancBp').value||'');
   try{ await api('/api/chw/anc',{method:'POST',body:{patientId:id,weeks,bp}}); toast('ANC visit logged'); openClient(id); }catch(e){ toast(e.message); } }
-SCREENS.register={ body(){
+SCREENS.register={ after(){ window.__cwLoc=null; try{ MediGeo.mountAutocomplete(document.getElementById("rArea"), p=>{ window.__cwLoc=p; }); }catch(e){} }, body(){
   return `<div style="margin-top:8px"></div><div class="card">
   <div class="field"><label>First name</label><input id="rFirst" placeholder="First name"></div>
   <div class="field"><label>Last name</label><input id="rLast" placeholder="Last name"></div>
@@ -482,7 +483,7 @@ SCREENS.register={ body(){
 }};
 async function registerClient(){ const first=($('rFirst').value||'').trim(), last=($('rLast').value||'').trim();
   if(!first||!last){ toast('Enter first and last name'); return; }
-  const body={first,last,phone:($('rPhone').value||'').trim(),area:($('rArea').value||'').trim(),sex:$('rSex').value};
+  const loc=window.__cwLoc||{}; const body={first,last,phone:($('rPhone').value||'').trim(),area:($('rArea').value||'').trim(),sex:$('rSex').value,homeLat:loc.lat,homeLng:loc.lng};
   const r=await submit('/api/chw/register',body);
   ['rFirst','rLast','rPhone','rArea'].forEach(k=>{ if($(k))$(k).value=''; });
   await load(); switchTab('today');

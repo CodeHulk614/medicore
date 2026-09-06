@@ -66,6 +66,7 @@ body{margin:0;font-family:'Inter',system-ui,sans-serif;background:var(--bg);colo
 
 <script src="/refresh.js"></script>
 <script src="/clockgate.js"></script>
+<script src="/geokit.js"></script>
 <script>
 'use strict';
 const API=(function(){ try{ if(window.MEDICORE_API) return window.MEDICORE_API; }catch(e){} return ''; })();const $=id=>document.getElementById(id);
@@ -187,8 +188,10 @@ function registerSheet(){openSheet(`<div class="grab"></div><div class="k" style
   <div class="row" style="gap:10px"><div class="field grow"><label>First name</label><input id="rFirst"></div><div class="field grow"><label>Last name</label><input id="rLast"></div></div>
   <div class="field"><label>Phone</label><input id="rPhone" placeholder="0803..."></div>
   <div class="row" style="gap:10px"><div class="field grow"><label>Sex</label><select id="rSex"><option value="">-</option><option>female</option><option>male</option></select></div><div class="field grow"><label>HMO (optional)</label><input id="rHmo" placeholder="e.g. Avon HMO"></div></div>
-  <button class="btn btn-primary btn-block" onclick="doRegister()">Register patient</button>`)}
-async function doRegister(){const body={first:$('rFirst').value.trim(),last:$('rLast').value.trim(),phone:$('rPhone').value,sex:$('rSex').value,hmo:$('rHmo').value,plan:$('rHmo').value?'HMO':'Self-pay'};if(!body.first||!body.last){toast('Name required');return}try{const p=await api('/api/frontdesk/register',{method:'POST',body});closeSheet();toast('Registered '+p.name);if(can('queue.manage'))checkinSheet(p)}catch(e){toast(e.message)}}
+  <div class="field"><label>Home address (optional)</label><input id="rAddr" placeholder="Search address\u2026"></div>
+  <button class="btn btn-primary btn-block" onclick="doRegister()">Register patient</button>`);
+  window.__rLoc=null; try{ MediGeo.mountAutocomplete(document.getElementById("rAddr"), p=>{ window.__rLoc=p; }); }catch(e){} }
+async function doRegister(){const loc=window.__rLoc||{};const body={first:$('rFirst').value.trim(),last:$('rLast').value.trim(),phone:$('rPhone').value,sex:$('rSex').value,hmo:$('rHmo').value,plan:$('rHmo').value?'HMO':'Self-pay',address:($('rAddr')&&$('rAddr').value.trim())||'',homeLat:loc.lat,homeLng:loc.lng};if(!body.first||!body.last){toast('Name required');return}try{const p=await api('/api/frontdesk/register',{method:'POST',body});closeSheet();toast('Registered '+p.name);if(can('queue.manage'))checkinSheet(p)}catch(e){toast(e.message)}}
 
 /* -------- CASHIER -------- */
 SCREENS.cashier={body(){return `<div style="margin-top:8px"></div>
