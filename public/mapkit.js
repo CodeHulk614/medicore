@@ -8,7 +8,7 @@
   var LEAFLET_JS = '/vendor/leaflet/leaflet.js';
   var LEAFLET_CSS = '/vendor/leaflet/leaflet.css';
   // critical Leaflet layout CSS, inlined so tiles position correctly even if the CDN stylesheet is slow or blocked
-  var CRITICAL_CSS = '.leaflet-container{position:relative;overflow:hidden;background:#e7ecec;-webkit-tap-highlight-color:transparent;outline:0}'
+  var CRITICAL_CSS = '.leaflet-container{position:relative;overflow:hidden;isolation:isolate;background:#e7ecec;-webkit-tap-highlight-color:transparent;outline:0}'
     + '.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}'
     + '.leaflet-tile{width:256px;height:256px;visibility:hidden}.leaflet-tile-loaded{visibility:inherit}'
     + '.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}'
@@ -77,6 +77,7 @@
     el.style.minHeight = el.style.minHeight || '240px';
     this.L = L; this.el = el;
     this.map = L.map(el, { zoomControl: true, attributionControl: true, scrollWheelZoom: true, dragging: true, tap: true, touchZoom: true, doubleClickZoom: true }).setView([6.5, 3.38], 12);
+    var self0 = this; this._userMoved = false; this.map.on('dragstart zoomstart', function () { self0._userMoved = true; });
     this.tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(this.map);
     // if the network blocks OSM tiles the map would just sit blank; detect that and let the caller fall back
     var loaded = 0, errored = 0;
@@ -108,14 +109,37 @@
     Object.keys(this.units).forEach(function (id) { if (!seen[id]) { self.map.removeLayer(self.units[id]); delete self.units[id]; } });
     this.ridersLayer.clearLayers();
     d.riders.forEach(function (r) { L.marker([r.lat, r.lng], { icon: L.divIcon({ className: '', html: '<div style="width:20px;height:20px;border-radius:50%;background:#E9B23C;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);color:#3a2a06;font:800 9px sans-serif;display:flex;align-items:center;justify-content:center">R</div>', iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(self.ridersLayer).bindTooltip(r.name || 'Rider'); });
-    if (!this._fitted) { var pts = []; d.units.forEach(function (u) { pts.push([u.lat, u.lng]); }); d.riders.forEach(function (r) { pts.push([r.lat, r.lng]); }); d.cases.forEach(function (c) { pts.push([c.lat, c.lng]); }); if (d.hospital) pts.push([d.hospital.lat, d.hospital.lng]); if (d.me) pts.push([d.me.lat, d.me.lng]); if (pts.length) { try { this.map.fitBounds(pts, { padding: [30, 30], maxZoom: 15 }); this._fitted = true; } catch (e) {} } }
+    var pts = []; d.units.forEach(function (u) { pts.push([u.lat, u.lng]); }); d.riders.forEach(function (r) { pts.push([r.lat, r.lng]); }); d.cases.forEach(function (c) { pts.push([c.lat, c.lng]); }); if (d.hospital) pts.push([d.hospital.lat, d.hospital.lng]); if (d.me) pts.push([d.me.lat, d.me.lng]);
+    pts = pts.filter(function (p) { return p[0] != null && p[1] != null; });
+    if (pts.length) {
+      try {
+        if (!this._fitted) { this.map.fitBounds(pts, { padding: [40, 40], maxZoom: 15 }); this._fitted = true; }
+        else if (!this._userMoved) {
+          var b = this.map.getBounds();
+          var outside = pts.some(function (p) { return !b.contains(p); });
+          if (outside) this.map.fitBounds(L.latLngBounds(pts).extend(b), { padding: [40, 40], maxZoom: 15 });   // widen to include far pins, never yanking closer
+        }
+      } catch (e) {}
+    }
   };
   LeafletMap.prototype.recenter = function () { this._fitted = false; };
   LeafletMap.prototype.destroy = function () { this._dead = true; try { window.removeEventListener('resize', this._resize); } catch (e) {} try { this.map.remove(); } catch (e) {} };
 
   function SvgMap(el) { this.el = el; el.style.minHeight = '220px'; }
   SvgMap.prototype.update = function (raw) {
-    var d = norm(raw), B = d.bounds || { latMin: 6.42, latMax: 6.63, lngMin: 3.31, lngMax: 3.56 }, W = 340, H = 230, P = 12;
+    var d = norm(raw), W = 340, H = 230, P = 12;
+    var all = []; d.units.forEach(function (u) { all.push([u.lat, u.lng]); }); d.riders.forEach(function (r) { all.push([r.lat, r.lng]); }); d.cases.forEach(function (c) { all.push([c.lat, c.lng]); }); if (d.hospital) all.push([d.hospital.lat, d.hospital.lng]); if (d.me) all.push([d.me.lat, d.me.lng]);
+    (d.routes || []).forEach(function (ln) { (ln || []).forEach(function (p) { all.push([p[0], p[1]]); }); });
+    all = all.filter(function (p) { return p[0] != null && p[1] != null; });
+    var B = d.bounds || null;
+    if (all.length) {
+      var laMin = Math.min.apply(null, all.map(function (p) { return p[0]; })), laMax = Math.max.apply(null, all.map(function (p) { return p[0]; }));
+      var loMin = Math.min.apply(null, all.map(function (p) { return p[1]; })), loMax = Math.max.apply(null, all.map(function (p) { return p[1]; }));
+      if (B) { laMin = Math.min(laMin, B.latMin); laMax = Math.max(laMax, B.latMax); loMin = Math.min(loMin, B.lngMin); loMax = Math.max(loMax, B.lngMax); }
+      var latPad = Math.max((laMax - laMin) * 0.18, 0.01), lngPad = Math.max((loMax - loMin) * 0.18, 0.01);
+      B = { latMin: laMin - latPad, latMax: laMax + latPad, lngMin: loMin - lngPad, lngMax: loMax + lngPad };
+    }
+    if (!B) B = { latMin: 6.42, latMax: 6.63, lngMin: 3.31, lngMax: 3.56 };
     var px = function (lng) { return P + ((lng - B.lngMin) / (B.lngMax - B.lngMin)) * (W - 2 * P); };
     var py = function (lat) { return P + ((B.latMax - lat) / (B.latMax - B.latMin)) * (H - 2 * P); };
     var grid = ''; var i; for (i = 0; i < 6; i++) grid += '<line x1="' + (P + i * (W - 2 * P) / 5) + '" y1="' + P + '" x2="' + (P + i * (W - 2 * P) / 5) + '" y2="' + (H - P) + '" stroke="rgba(120,140,140,.18)" stroke-width="1"/>';
