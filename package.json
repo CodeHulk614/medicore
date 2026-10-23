@@ -1,23 +1,21 @@
 {
-  "name": "medicore-server",
-  "version": "1.0.0",
+  "name": "medicore",
+  "version": "2.0.0",
   "private": true,
+  "description": "MediCore: modular health platform for hospitals, clinics, pharmacies, ambulance services and labs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node seed.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "seed:demo": "node scripts/seed-demo.js"
   },
+  "engines": { "node": ">=20" },
   "dependencies": {
-    "@netlify/blobs": "^8.2.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "cookie-parser": "^1.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.21.0",
-    "pg": "^8.23.0",
     "serverless-http": "^3.2.0"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }

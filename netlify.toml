@@ -1,29 +1,38 @@
-# MediCore — ALL-ON-NETLIFY edition.
-# The 11 apps (public/) are static; the whole API runs as one Netlify Function
-# backed by Netlify Blobs (free). No separate backend host needed.
-
+# MediCore v2 on Netlify: static apps in public/, the whole API as one function.
 [build]
   publish = "public"
   command = ""
 
 [functions]
   node_bundler = "esbuild"
-  # bundle these into the function
-  external_node_modules = ["express", "bcryptjs", "jsonwebtoken", "cors", "serverless-http", "@netlify/blobs", "pg", "mongodb"]
+  external_node_modules = ["express", "bcryptjs", "jsonwebtoken", "cookie-parser", "serverless-http", "mongodb"]
+  included_files = []
 
-# every /api call goes to the function
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api"
+  to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
 
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://api.maptiler.com; font-src 'self'; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://checkout.paystack.com; object-src 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(self), camera=(self), microphone=(self), payment=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Frame-Options = "DENY"
 [[headers]]
   for = "/*.html"
   [headers.values]
     Cache-Control = "no-cache"
 [[headers]]
-  for = "/*.js"
+  for = "/apps/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+[[headers]]
+  for = "/assets/*"
   [headers.values]
     Cache-Control = "no-cache"
 [[headers]]
@@ -32,7 +41,7 @@
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
 [[headers]]
-  for = "/*.webmanifest"
+  for = "/manifests/*"
   [headers.values]
     Content-Type = "application/manifest+json"
 [[headers]]

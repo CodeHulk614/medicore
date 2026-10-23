@@ -1,10 +1,5 @@
-# dependencies (Netlify/Render run npm install for you)
 node_modules/
-# local datastore (seeded fresh on each deploy)
 data/
-*.local.json
-# os / editor noise
-.DS_Store
 .env
+*.log
 .netlify/
-npm-debug.log*

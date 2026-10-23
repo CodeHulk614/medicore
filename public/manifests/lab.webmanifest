@@ -1,0 +1,28 @@
+{
+ "id": "/lab.html",
+ "name": "MediCore Lab",
+ "short_name": "Lab",
+ "start_url": "/lab.html",
+ "scope": "/",
+ "display": "standalone",
+ "background_color": "#F5F8F7",
+ "theme_color": "#6B3FA0",
+ "icons": [
+  {
+   "src": "/icons/lab-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/icons/lab-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "/icons/lab-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
