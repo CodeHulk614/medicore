@@ -164,6 +164,7 @@ class MemoryCollection {
     return clone(d);
   }
   async insertMany(docs) { const out = []; for (const d of docs) out.push(await this.insertOne(d)); return out; }
+  async bulkInsert(docs) { await this.insertMany(docs); }
   async find(filter = {}, opts = {}) {
     let res = [];
     for (const d of this.docs.values()) if (matches(d, filter)) res.push(d);
@@ -241,6 +242,7 @@ class MemoryStore {
   }
   async ping() { return true; }
   async dropAll() { for (const c of this.cols.values()) c.docs.clear(); this._dirty(); }
+  async dropAllExcept(keepMetaIds) { for (const [n, c] of this.cols) { if (n !== 'meta') c.docs.clear(); else for (const k of [...c.docs.keys()]) if (!keepMetaIds.includes(k)) c.docs.delete(k); } this._dirty(); }
 }
 
 module.exports = { MemoryStore, matches, applyUpdate };

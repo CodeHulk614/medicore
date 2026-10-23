@@ -19,6 +19,8 @@ class MongoCollection {
   }
   async insertOne(doc) { if (!doc.id) throw new Error('insertOne: document needs an id'); const d = Object.assign({ _id: doc.id }, doc); await this.col.insertOne(d); return strip(d); }
   async insertMany(docs) { const out = []; for (const d of docs) out.push(await this.insertOne(d)); return out; }
+  /** one round trip for many documents (demo loading) */
+  async bulkInsert(docs) { for (let i = 0; i < docs.length; i += 1000) await this.col.insertMany(docs.slice(i, i + 1000).map(d => Object.assign({ _id: d.id }, d)), { ordered: false }); }
   async find(filter = {}, opts = {}) {
     let c = this.col.find(idFilter(filter), { projection: stripProj(opts.projection) });
     if (opts.sort) c = c.sort(opts.sort);
@@ -62,6 +64,8 @@ class MongoStore {
   collection(name) { if (!this.cols.has(name)) this.cols.set(name, new MongoCollection(this.db.collection(name))); return this.cols.get(name); }
   async ping() { await this.db.command({ ping: 1 }); return true; }
   async dropAll() { const cols = await this.db.listCollections().toArray(); for (const c of cols) await this.db.collection(c.name).deleteMany({}); }
+  /** empty every collection except the given documents of `meta` (keeps a load lock in place) */
+  async dropAllExcept(keepMetaIds) { const cols = await this.db.listCollections().toArray(); await Promise.all(cols.map(c => this.db.collection(c.name).deleteMany(c.name === 'meta' ? { _id: { $nin: keepMetaIds } } : {}))); }
 }
 
 module.exports = { MongoStore };

@@ -1,5 +1,5 @@
 /* MediCore service worker: app shell works offline; the API is never cached. */
-const CACHE = 'medicore-v2.4.0';
+const CACHE = 'medicore-v2.4.1';
 const SHELL = ['/assets/mc.css', '/assets/mc.js', '/assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2', '/assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2',
   '/index.html', '/register.html', '/frontdesk.html', '/doctor.html', '/pharmacy.html', '/rider.html', '/dispatch.html', '/crew.html', '/lab.html', '/chw.html', '/payer.html', '/admin.html', '/group.html', '/hq.html',
   '/apps/patient.js', '/apps/register.js', '/apps/frontdesk.js', '/apps/doctor.js', '/apps/pharmacy.js', '/apps/rider.js', '/apps/dispatch.js', '/apps/crew.js', '/apps/lab.js', '/apps/chw.js', '/apps/payer.js', '/apps/admin.js', '/apps/group.js', '/assets/referrals.js', '/assets/whatsapp.js', '/assets/caretools.js', '/assets/patient-market.js', '/apps/hq-config.js', '/apps/hq.js'];

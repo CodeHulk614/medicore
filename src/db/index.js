@@ -44,4 +44,13 @@ async function resetForTests() {
   return store;
 }
 
-module.exports = { init, col, index, resetForTests, get kind() { return store ? store.kind : null; }, get store() { return store; } };
+/** run fn against a fresh in-memory store (same indexes), then switch back. Used to build the demo data quickly. */
+async function withMemoryStore(fn) {
+  const prev = store; const prevReady = ready;
+  const mem = new MemoryStore(null);
+  for (const ix of indexes) await mem.collection(ix.colName).createIndex(ix.fields, ix.opts);
+  store = mem; ready = Promise.resolve(mem);
+  try { await fn(); return mem; } finally { store = prev; ready = prevReady; }
+}
+
+module.exports = { init, col, index, resetForTests, withMemoryStore, get kind() { return store ? store.kind : null; }, get store() { return store; } };

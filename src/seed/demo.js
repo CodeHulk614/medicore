@@ -60,8 +60,11 @@ const PATIENTS = [
   { key: 'kunle', firstName: 'Kunle', lastName: 'Martins', dob: '1958-11-03', sex: 'male', phone: '+2348077770202', email: 'kunle@patient.demo', address: '9 Bourdillon Rd, Ikoyi', homeLoc: { lat: 6.4520, lng: 3.4350 }, bloodGroup: 'O-', genotype: 'AA', weightKg: 90, allergies: [], noKnownAllergies: true, conditions: [{ name: 'Atrial fibrillation', code: 'I48' }], meds: ['WARF5'], account: true, links: ['clinic', 'lab'] },
 ];
 
+// one hash for every demo account: hashing 50+ times took longer than a serverless request may run
+let DEMO_HASH = null;
 async function mkUser({ name, email, phone, patientId, platformRole }) {
-  const u = { id: id('usr'), name, passHash: await A.hashPassword(DEMO_PASSWORD), status: 'active', mustChangePassword: false, createdAt: now(), demo: true };
+  if (!DEMO_HASH) DEMO_HASH = await A.hashPassword(DEMO_PASSWORD);
+  const u = { id: id('usr'), name, passHash: DEMO_HASH, status: 'active', mustChangePassword: false, createdAt: now(), demo: true };
   if (email) u.email = email; if (phone) u.phone = phone; if (patientId) u.patientId = patientId; if (platformRole) u.platformRole = platformRole;
   await db.col('users').insertOne(u); return u;
 }

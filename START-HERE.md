@@ -104,6 +104,13 @@ Track every registration and agreement in **HQ > Compliance**. An item there can
 
 Install Node.js 20+, then in the folder: `npm install`, then `DEMO_MODE=1 npm start` (Windows PowerShell: `$env:DEMO_MODE=1; npm start`) and open http://localhost:4000/hq.html. Run the automated tests with `npm test`.
 
+## What changed in v2.4.1 (October 2026)
+
+- Demo loading on Netlify is fast enough to finish inside one request (about 2 seconds instead of over 10). The demo is built in memory and copied to MongoDB in bulk.
+- A half-finished earlier demo load is cleared and loaded again automatically. This fixes "That already exists" on sign-in.
+- Two cold starts can no longer load the demo at the same time.
+- DEMO_MODE never wipes a database that holds non-demo accounts; it stops with a clear message instead.
+
 ## What changed in v2.4 (October 2026)
 
 - Patients register with a NIN, checked with a licensed NIMC partner. The NIN itself is never stored, only a keyed fingerprint and the last 4 digits. Staff can register without one when they give a reason (a child, an emergency, not yet enrolled).
