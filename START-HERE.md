@@ -104,6 +104,12 @@ Track every registration and agreement in **HQ > Compliance**. An item there can
 
 Install Node.js 20+, then in the folder: `npm install`, then `DEMO_MODE=1 npm start` (Windows PowerShell: `$env:DEMO_MODE=1; npm start`) and open http://localhost:4000/hq.html. Run the automated tests with `npm test`.
 
+## What changed in v2.5 (October 2026)
+
+- New app look in every app. On phones: a frosted top bar, a floating glass tab bar, cards with soft depth, pill buttons, chip-style tabs, rounder fields and bottom sheets for dialogs. On computers the same rounding and depth, with the side menu kept.
+- A provider's own colour now works in dark mode too.
+- All of it lives in public/assets/mc.css (the "App look" section at the end), so colours, rounding and glass strength can be tuned in one place.
+
 ## What changed in v2.4.1 (October 2026)
 
 - Demo loading on Netlify is fast enough to finish inside one request (about 2 seconds instead of over 10). The demo is built in memory and copied to MongoDB in bulk.

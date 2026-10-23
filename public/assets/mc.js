@@ -553,7 +553,7 @@
     catch (e) { try { cfg = JSON.parse(localStorage.getItem('mc-cfg-' + APP) || 'null'); } catch (e2) { cfg = null; } }
     cfg = cfg || { branding: { app: {} }, content: {}, features: {} };
     const a = cfg.branding.app || {};
-    if (a.hue && /^#[0-9a-fA-F]{6}$/.test(a.hue)) { document.body.style.setProperty('--hue', a.hue); document.body.style.setProperty('--hue-soft', 'color-mix(in srgb, ' + a.hue + ' 12%, white)'); }
+    if (a.hue && /^#[0-9a-fA-F]{6}$/.test(a.hue)) { document.body.style.setProperty('--hue', a.hue); document.body.style.setProperty('--hue-soft', 'color-mix(in srgb, ' + a.hue + ' 16%, var(--surface))'); }
     if (a.title) { boot.title = a.title; document.title = a.title; }
     overrides = (cfg.content && cfg.content.i18n) || {};
     if (cfg.features && Array.isArray(cfg.features.languages)) enabledLangs = ['en'].concat(cfg.features.languages.filter(l => l !== 'en'));
