@@ -126,6 +126,9 @@
     aiPatientAssistant: 'AI health assistant for patients', aiClinicianAssistant: 'AI drafting help for doctors (doctor approves)', aiLabExplainer: 'AI plain-language lab result explanations', chw: 'Community health worker app', onlinePayments: 'Online card, transfer and USSD payments',
     cashPayments: 'Cash and POS at the counter', hmoClaims: 'HMO cover, pre-authorisation and claims', lowDataMode: 'Low-data mode (fewer images and maps)', maintenanceMode: 'Maintenance mode: providers can read but not change anything',
     groups: 'Hospital groups with several branches', referralNetwork: 'Referrals between providers', providerMessaging: 'Private messages between providers', providerDirectory: 'Provider directory for staff (find partners)',
+    marketplacePharmacy: 'Marketplace patients can order medicines from pharmacies they are not registered with (needs PCN e-pharmacy registration)', careSharing: 'Shared care: providers look after a patient together on one record', wearables: 'Health devices: patients sync watches and home devices; providers ask for readings',
+    documents: 'Documents: scanned records, letters with verification codes, signed consent forms', inventory: 'Stores and bed capacity for wards, lab and ambulances', publicFacilities: 'Public and government hospitals on the map (not on MediCore)',
+    transfers: 'Emergency transfers with transfer packs and ambulance requests', hmoRetail: 'Patients buy HMO plans in the app', hmoNetwork: 'HMO provider networks, primary providers and capitation',
   };
   const featureLabel = k => T('ft.' + k, FEATURE_INFO[k] || cap(k.replace(/([A-Z])/g, ' $1').toLowerCase()));
   async function features() {
@@ -152,13 +155,20 @@
     appointments: { _t: 'Appointments', patientCancelHours: ['Patients can cancel up to', 'hours before'], defaultSlotMinutes: ['Default slot length', 'minutes'], videoJoinEarlyMinutes: ['Video room opens early by', 'minutes'], videoJoinLateMinutes: ['Video room stays open for', 'minutes after start'], payBeforeVideo: ['Video visits must be paid first', 'bool'] },
     pharmacy: { _t: 'Pharmacy', pickupWindowDays: ['Days to collect before an order is missed', 'days'], deliveryCodeAttempts: ['Wrong delivery codes before lock', 'tries'], requirePharmacistVerify: ['A pharmacist must verify every prescription', 'bool'], allowSubstitution: ['Allow generic substitution with a reason', 'bool'] },
     lab: { _t: 'Laboratory', twoStepVerifyDefault: ['New labs need a second scientist to verify', 'bool'], collectBeforePaymentForUrgent: ['Urgent samples can be taken before payment', 'bool'] },
-    hmo: { _t: 'HMO', preauthThresholdKobo: ['Pre-authorisation needed above', 'naira'], duplicateWindowHours: ['Duplicate claim window', 'hours'], frequencyLimitPer30Days: ['Same service per patient per 30 days before flag', 'times'] },
-    emergency: { _t: 'Emergency', publicPerIpPerHour: ['Public reports per network per hour', ''], sosRadiusKm: ['Search radius for the nearest ambulance', 'km'], locationFreshSeconds: ['Ambulance location counts as live for', 'seconds'] },
+    hmo: { _t: 'HMO', preauthThresholdKobo: ['Pre-authorisation needed above', 'naira'], duplicateWindowHours: ['Duplicate claim window', 'hours'], frequencyLimitPer30Days: ['Same service per patient per 30 days before flag', 'times'],
+      primaryChangeMinMonths: ['Members can change primary provider every', 'months'], maxDependants: ['Family members per cover when the plan does not say', ''],
+      verifyCardAnyProvider: ['Any provider can check a member card (not only the HMO\'s network and panel)', 'bool'],
+      uninsuredBuyFree: ['Patients with no HMO can browse and buy HMO plans free', 'bool', 'Gets the uninsured insured: no marketplace subscription needed for a first HMO.'],
+      otherHmosNeedSubscription: ['Patients who already have an HMO need the marketplace to compare other HMOs', 'bool'] },
+    wearables: { _t: 'Health devices', requestExpiryMinutes: ['A provider\'s request for a reading stays open for', 'minutes'] },
+    identity: { _t: 'Identity (NIN)', requireNin: ['Patients need a NIN before a provider onboards them', 'bool'], allowNoNinWithReason: ['Staff may register without a NIN when they give a reason', 'bool'], matchDob: ['The date of birth must match the NIN record', 'bool'], showHmoBeforeConsent: ['Providers see a patient\'s HMO before the patient shares their record', 'bool'] },
+    emergency: { _t: 'Emergency', publicPerIpPerHour: ['Public reports per network per hour', ''], sosRadiusKm: ['Search radius for the nearest ambulance', 'km'], locationFreshSeconds: ['Ambulance location counts as live for', 'seconds'], patientChoosesService: ['Patients can pick which ambulance service comes', 'bool'], fallbackCallKobo: ['Call-out price when a service set none', 'naira'], fallbackAlsKobo: ['Advanced life support call-out when a service set none', 'naira'], fallbackPerKmKobo: ['Price per km when a service set none', 'naira'], bookingFeeKobo: ['MediCore emergency booking fee (0 = off)', 'naira'] },
     delivery: { _t: 'Delivery', riderLocationFreshSeconds: ['Rider location counts as live for', 'seconds'] },
     ai: { _t: 'AI assistant', patientDailyMessages: ['Messages per patient per day', 'messages'], conversationRetentionDays: ['Keep conversations for', 'days'] },
     billing: { _t: 'Billing', platformFeeKobo: ['MediCore fee per bill', 'naira'], bankChargeKobo: ['Bank service charge per payment', 'naira'], showBankChargeToPatient: ['Show the bank charge to patients', 'bool'] },
     patients: { _t: 'Patients and providers',
       mode: ['How patients relate to providers', 'select:provider,open'],
+      freeFirstProvider: ['A self-registered patient joins their first provider free', 'bool', 'Joining more providers then needs the marketplace subscription. Referrals and shared care between providers are always free.'],
       allowMultipleProviders: ['A patient can belong to more than one provider', 'bool', 'When off, a patient registered at one provider cannot apply to another.'],
       applicationsNeedApproval: ['Patient applications need the provider\'s approval', 'bool', 'When off, a patient who applies to a provider is accepted at once.'],
       crossProviderSharing: ['Patients can share their records with another provider themselves', 'bool', 'Only used in provider mode. Referrals always carry a record summary.'],
@@ -167,6 +177,20 @@
       requireApproval: ['New branches need HQ approval', 'bool', 'When off, a branch added by an active group goes live at once.'],
       shareRecordsAcrossBranches: ['Branches of a group see each other\'s patient records', 'bool', 'A patient registered at one branch is a patient of every branch.'],
       branchAdminsManageModules: ['Branch admins can change their branch\'s apps and subscription', 'bool', 'When off, only the group console changes apps.'] },
+    marketplace: { _t: 'Patient marketplace',
+      monthlyKobo: ['Monthly access', 'naira'], quarterlyKobo: ['3-month access', 'naira'], annualKobo: ['12-month access', 'naira'],
+      freeTrialDays: ['Free trial', 'days'], defaultRadiusKm: ['Default search distance', 'km'],
+      hmoMembersSeeNetwork: ['HMO members see their HMO\'s network free', 'bool', 'The HMO pays for its network; members do not need a subscription for it.'],
+      autoRegisterOnUse: ['Register marketplace patients at a provider the first time they use it', 'bool', 'A provider can still choose to approve joiners itself.'],
+      showTeaser: ['Show non-subscribers how many providers are near them', 'bool'] },
+    careShare: { _t: 'Shared care',
+      requirePatientConsent: ['The patient must agree before providers share their care', 'bool'],
+      allowCodeConsent: ['Patients without the app can agree with an SMS code at the desk', 'bool'],
+      defaultDays: ['A share lasts', 'days'], maxDays: ['Longest share allowed', 'days'] },
+    documents: { _t: 'Documents',
+      maxFileMb: ['Largest page or file', 'MB'], maxFilesPerDocument: ['Pages per document', ''],
+      patientUploads: ['Patients can add their own old records', 'bool'], patientSeesProviderScans: ['Patients see the papers providers scanned for them', 'bool'] },
+    transfers: { _t: 'Emergency transfers', packHours: ['A transfer pack link works for', 'hours'], packMaxViews: ['A transfer pack can be opened', 'times'] },
     referrals: { _t: 'Referrals between providers',
       requireConnection: ['Providers can only refer to their partners', 'bool', 'When off, any provider in the directory can receive a referral.'],
       requirePatientConsent: ['The patient\'s consent is needed to send a referral', 'bool', 'Emergencies never need it.'],
@@ -341,6 +365,14 @@
     maps: [{ p: 'maps.tileUrl', l: YES('maps_url', 'Tile address (https, with {z}/{x}/{y})'), k: 'url' }, { p: 'maps.attribution', l: YES('maps_attr', 'Attribution text') }],
     geocoder: [{ p: 'geocoder.url', l: YES('geo_url', 'Photon-compatible address (https)'), k: 'url' }],
     routing: [{ p: 'routing.url', l: YES('rt_url', 'OSRM-compatible address (https)'), k: 'url' }],
+    identity: [{ p: 'identity.provider', l: YES('id_prov', 'NIN verification partner'), k: 'select', o: [['', YES('id_off', 'Off: NINs are saved and confirmed by staff')], ['dojah', 'Dojah'], ['prembly', 'Prembly (IdentityPass)'], ['custom', YES('id_custom', 'Another licensed partner (custom API)')]] },
+      { p: 'identity.baseUrl', l: YES('id_base', 'API address (https)'), k: 'url', h: YES('id_base_h', 'For example https://api.dojah.io or https://api.prembly.com. Check the paths against the partner\'s current docs.') },
+      { p: 'identity.appId', l: YES('id_app', 'App ID') }, { p: 'identity.apiKey', l: YES('id_key', 'Secret key'), k: 'secret' },
+      { p: 'identity.path', l: YES('id_path', 'Lookup path (optional)'), h: YES('id_path_h', 'Leave empty for the partner\'s default. For a custom API use {{nin}} where the number goes.') },
+      { p: 'identity.method', l: YES('id_method', 'Method (custom API)'), k: 'select', o: [['GET', 'GET'], ['POST', 'POST']], when: 'identity.provider=custom' },
+      { p: 'identity.headerName', l: YES('id_hname', 'Header for the key (custom API)'), when: 'identity.provider=custom' },
+      { p: 'identity.dataPath', l: YES('id_data', 'Where the person sits in the reply (custom API)'), when: 'identity.provider=custom', h: YES('id_data_h', 'For example data or entity. MediCore reads first_name, last_name and date_of_birth from there.') }],
+    wearables: [{ p: 'wearables.provider', l: YES('wr_prov', 'Wearables partner'), k: 'select', o: [['', YES('wr_off', 'Off: companion app, Bluetooth and typed readings only')], ['terra', 'Terra']] }, { p: 'wearables.baseUrl', l: YES('wr_base', 'API address (https)'), k: 'url' }, { p: 'wearables.devId', l: YES('wr_dev', 'Developer ID') }, { p: 'wearables.apiKey', l: YES('wr_key', 'API key'), k: 'secret' }, { p: 'wearables.webhookSecret', l: YES('wr_hook', 'Webhook signing secret'), k: 'secret' }],
     ussd: [{ p: 'ussd.secret', l: YES('ussd_sec', 'Shared secret'), k: 'secret', h: YES('ussd_sec_h', 'The aggregator sends this with every USSD request.') }],
     ai: [{ p: 'ai.provider', l: YES('ai_prov', 'Provider'), k: 'select', o: [['anthropic', 'Anthropic'], ['openai', 'OpenAI'], ['google', 'Google'], ['openai_compatible', YES('ai_compat', 'OpenAI-compatible endpoint')]] }, { p: 'ai.model', l: YES('ai_model', 'Main model') }, { p: 'ai.fastModel', l: YES('ai_fast', 'Fast model for simple questions') }, { p: 'ai.apiKey', l: YES('ai_key', 'API key'), k: 'secret' }, { p: 'ai.baseUrl', l: YES('ai_base', 'Custom endpoint (optional, https)'), k: 'url' }, { p: 'ai.maxTokens', l: YES('ai_tokens', 'Longest answer (tokens)'), k: 'number' }, { p: 'ai.monthlyBudgetNgn', l: YES('ai_budget', 'Monthly budget (NGN)'), k: 'number' }, { p: 'ai.region', l: YES('ai_region', 'Data region note') }],
     whatsapp: [
@@ -383,10 +415,10 @@
   SPECS = buildSpecs();
   PAY_GW = [['paystack', 'Paystack', 'paystack', 'paystack'], ['flutterwave', 'Flutterwave', 'flutterwave', 'flutterwave'], ['monnify', 'Monnify', 'monnify', 'monnify'], ['custom', T('in.custom_t', 'Bank or custom API'), 'customPayment', 'customPayment']];
   SMS_GW = [['termii', 'Termii', 'termii', 'termii'], ['africastalking', 'Africa\'s Talking', 'africastalking', 'africastalking'], ['custom', T('in.custom_sms_t', 'Custom HTTP API'), 'customSms', null]];
-  OTHER = [['turn', T('in.turn', 'Video relay (TURN)'), null, T('in.turn_d', 'Needed so video visits connect on mobile networks that block direct calls.')], ['maps', T('in.maps', 'Map tiles'), null, T('in.maps_d', 'The background map in dispatch, rider and patient tracking screens.')], ['geocoder', T('in.geocoder', 'Address search'), null, ''], ['routing', T('in.routing', 'Road routing'), null, ''], ['ussd', T('in.ussd', 'USSD aggregator'), null, T('in.ussd_d', 'Give the aggregator this address: {url}', { url: location.origin + '/api/ussd' })], ['ai', T('in.ai', 'AI assistant'), 'ai', '']];
+  OTHER = [['turn', T('in.turn', 'Video relay (TURN)'), null, T('in.turn_d', 'Needed so video visits connect on mobile networks that block direct calls.')], ['maps', T('in.maps', 'Map tiles'), null, T('in.maps_d', 'The background map in dispatch, rider and patient tracking screens.')], ['geocoder', T('in.geocoder', 'Address search'), null, ''], ['routing', T('in.routing', 'Road routing'), null, ''], ['ussd', T('in.ussd', 'USSD aggregator'), null, T('in.ussd_d', 'Give the aggregator this address: {url}', { url: location.origin + '/api/ussd' })], ['ai', T('in.ai', 'AI assistant'), 'ai', ''], ['wearables', T('in.wearables', 'Wearables partner'), null, T('in.wearables_d', 'Connects watch brands\' cloud accounts (Fitbit, Garmin, Withings, Oura, Polar, Huawei). Webhook address: {url}', { url: location.origin + '/api/wearables/webhook/terra' })], ['identity', T('in.identity', 'NIN verification'), null, T('in.identity_d', 'Confirms each patient\'s NIN with a licensed NIMC partner at registration. Needs an account with the partner and a data processing agreement.')]];
   ITABS = [['payments', T('in.t.payments', 'Payments')], ['sms', T('in.t.sms', 'SMS')], ['whatsapp', T('in.t.whatsapp', 'WhatsApp')], ['wanumbers', T('in.t.wanumbers', 'WhatsApp numbers')], ['email', T('in.t.email', 'Email')], ['other', T('in.t.other', 'Video, maps, USSD and AI')]];
   }
-  const KEY_TAB = { payments: 'payments', sms: 'sms', turn: 'other', maps: 'other', geocoder: 'other', routing: 'other', ussd: 'other', ai: 'other', whatsapp: 'whatsapp', wanumbers: 'wanumbers', email: 'email' };
+  const KEY_TAB = { payments: 'payments', sms: 'sms', turn: 'other', maps: 'other', geocoder: 'other', routing: 'other', ussd: 'other', ai: 'other', identity: 'other', wearables: 'other', whatsapp: 'whatsapp', wanumbers: 'wanumbers', email: 'email' };
   const settingsHref = key => (key === 'connectors' ? '#/connectors' : '#/config/integrations?tab=' + (KEY_TAB[key] || 'other') + '&panel=' + key);
 
   function renderField(f, src, owner) {
@@ -934,15 +966,70 @@
     document.querySelector('[data-sp-pri]').addEventListener('change', async e => { try { await api.patch('/api/hq/support/' + r.id, { priority: e.target.value }); toast(T('sp.pri_changed', 'Priority changed'), 'ok'); } catch (err) { MC.showError(err); } });
   }
 
+
+  /* ---------- public hospitals (not on MediCore) and the marketplace ---------- */
+  const FK = { teaching: 'Teaching hospital', federal_medical_centre: 'Federal medical centre', specialist: 'Specialist hospital', general: 'General hospital', cottage: 'Cottage hospital', phc: 'Primary health centre', military: 'Military hospital', mission: 'Mission hospital', private: 'Private (not on MediCore)', other: 'Other' };
+  const fkLabel = k => T('fac.kind.' + k, FK[k] || cap(k));
+  async function facilitiesPage({ query }) {
+    const r = await api.get('/api/hq/facilities' + (query.q ? '?q=' + encodeURIComponent(query.q) : query.unverified ? '?unverified=true' : ''));
+    const M = r.meta; const w = can('platform.config');
+    view(html`<div class="page-head"><div><h1>${T('fac.title', 'Public hospitals')}</h1><p>${T('fac.sub', 'Government, mission and other hospitals that are not on MediCore yet. Staff see them in the emergency transfer finder; everyone sees emergency ones on the map.')}</p></div>
+      ${w ? html`<div class="actions"><button class="btn primary" data-action="fac-new">${icon('plus')}${T('fac.new', 'Add a hospital')}</button><button class="btn" data-action="fac-import">${icon('download')}${T('fac.import', 'Import a spreadsheet')}</button></div>` : ''}</div>
+      ${r.suggestions ? html`<div class="notice warn">${T('fac.sugg', '{n} corrections from providers are waiting.', { n: r.suggestions })} <a href="#/facilities/suggestions">${T('fac.sugg_open', 'Review them')}</a></div>` : ''}
+      <form class="row" data-form="fac-q" novalidate style="margin-bottom:12px"><input class="input" name="q" value="${query.q || ''}" placeholder="${T('fac.search', 'Search by name or LGA')}" aria-label="${T('fac.search', 'Search by name or LGA')}" style="flex:1"><button class="btn" type="submit">${icon('search')}</button><a class="btn" href="#/facilities?unverified=1">${T('fac.unverified', 'Numbers not checked')}</a></form>
+      <section class="panel flush">${r.facilities.length ? html`<ul class="list">${r.facilities.map(f => html`<li><div class="grow"><span class="title">${f.name} ${f.verified ? badge(T('fac.verified', 'Numbers checked'), 'ok') : badge(T('fac.not_verified', 'Not checked'), 'warn')}</span><span class="sub">${[fkLabel(f.kind), cap(f.level), f.lga, f.state, f.location ? '' : T('fac.no_loc', 'no map location')].filter(Boolean).join(' | ')}</span><span class="sub">${(f.phones || []).map(p => cap(p.kind) + ': ' + p.number).join(' | ')}</span></div>${w ? html`<span class="end"><button class="btn sm" data-action="fac-edit" data-id="${f.id}">${T('fac.edit', 'Edit')}</button></span>` : ''}</li>`)}</ul>` : empty({ icon: 'building', title: T('fac.none', 'No hospitals yet'), body: T('fac.none_sub', 'Import the list of public hospitals in your states, then call each to check the numbers.') })}</section>`);
+    const fields = f => html`<div class="field"><label for="fc-n">${T('fac.name', 'Name')}</label><input class="input" id="fc-n" name="name" required maxlength="160" value="${f ? f.name : ''}"></div>
+      <div class="fields three"><div class="field"><label for="fc-k">${T('fac.kind', 'Kind')}</label><select class="input" id="fc-k" name="kind">${M.kinds.map(k => html`<option value="${k}" ${f && f.kind === k ? 'selected' : ''}>${fkLabel(k)}</option>`)}</select></div><div class="field"><label for="fc-o">${T('fac.owner', 'Owner')}</label><select class="input" id="fc-o" name="ownership">${M.ownership.map(k => html`<option value="${k}" ${f && f.ownership === k ? 'selected' : ''}>${cap(k)}</option>`)}</select></div><div class="field"><label for="fc-l">${T('fac.level', 'Level')}</label><select class="input" id="fc-l" name="level">${M.levels.map(k => html`<option value="${k}" ${f && f.level === k ? 'selected' : ''}>${cap(k)}</option>`)}</select></div></div>
+      <div class="fields three"><div class="field"><label for="fc-s">${T('fac.state', 'State')}</label><input class="input" id="fc-s" name="state" maxlength="40" value="${f ? f.state || '' : 'Lagos'}"></div><div class="field"><label for="fc-g">LGA</label><input class="input" id="fc-g" name="lga" maxlength="60" value="${f ? f.lga || '' : ''}"></div><div class="field"><label for="fc-a">${T('fac.address', 'Address')}</label><input class="input" id="fc-a" name="address" maxlength="300" value="${f ? f.address || '' : ''}"></div></div>
+      <div class="fields two"><div class="field"><label for="fc-la">${T('fac.lat', 'Latitude')}</label><input class="input" id="fc-la" name="lat" type="number" step="any" value="${f && f.location ? f.location.lat : ''}"></div><div class="field"><label for="fc-lo">${T('fac.lng', 'Longitude')}</label><input class="input" id="fc-lo" name="lng" type="number" step="any" value="${f && f.location ? f.location.lng : ''}"></div></div>
+      <div class="fields three">${['main', 'emergency', 'transfer'].map(k => html`<div class="field"><label for="fc-p${k}">${T('fac.ph.' + k, cap(k) + ' number')}</label><input class="input" id="fc-p${k}" name="ph_${k}" inputmode="tel" value="${f ? ((f.phones || []).find(p => p.kind === k) || {}).number || '' : ''}"></div>`)}</div>
+      <div class="field"><span class="label">${T('fac.services', 'Services')}</span><div class="fields three">${M.services.map(s => html`<label class="check"><input type="checkbox" name="services" data-list value="${s}" ${f && (f.services || []).includes(s) ? 'checked' : ''}><span>${cap(s)}</span></label>`)}</div></div>
+      <label class="check"><input type="checkbox" name="open24h" ${f && f.open24h ? 'checked' : ''}><span>${T('fac.24h', 'Open 24 hours')}</span></label><label class="check"><input type="checkbox" name="verified" ${f && f.verified ? 'checked' : ''}><span>${T('fac.checked', 'We called and checked the numbers')}</span></label>
+      ${f ? html`<label class="check"><input type="checkbox" name="hidden" ${f.status === 'hidden' ? 'checked' : ''}><span>${T('fac.hide', 'Hide from the map')}</span></label>` : ''}`;
+    const toBody = d => { const b = { name: d.name, kind: d.kind, ownership: d.ownership, level: d.level, state: d.state || '', lga: d.lga || '', address: d.address || '', services: d.services || [], open24h: !!d.open24h, verified: !!d.verified, phones: ['main', 'emergency', 'transfer'].filter(k => d['ph_' + k]).map(k => ({ number: d['ph_' + k], kind: k })) }; if (d.lat != null && d.lng != null) b.location = { lat: d.lat, lng: d.lng }; if ('hidden' in d) b.status = d.hidden ? 'hidden' : 'active'; return b; };
+    on('fac-new', async () => { if (await dialog({ title: T('fac.new', 'Add a hospital'), wide: true, form: true, body: fields(null), actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('fac.save', 'Save'), primary: true }], onSubmit: d => api.post('/api/hq/facilities', toBody(d)) })) MC.render(); });
+    on('fac-edit', async el => { const f = r.facilities.find(x => x.id === el.dataset.id); if (await dialog({ title: f.name, wide: true, form: true, body: fields(f), actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('fac.save', 'Save'), primary: true }], onSubmit: d => api.patch('/api/hq/facilities/' + f.id, toBody(d)) })) MC.render(); });
+    on('fac-import', async () => {
+      let text = '';
+      const v = await dialog({ title: T('fac.import', 'Import a spreadsheet'), wide: true, form: true, body: html`<p class="sm">${T('fac.import_help', 'Save your spreadsheet as CSV with a header row. Columns: name, kind, ownership, level, state, lga, address, lat, lng, main_phone, emergency_phone, transfer_phone, services (separated by |), open24h (yes or no), hfr_id. Rows with the same HFR id, or the same name and state, are updated.')}</p>
+        <div class="field"><label for="fi-f">${T('fac.file', 'CSV file')}</label><input class="input" id="fi-f" type="file" accept=".csv,text/csv"></div><label class="check"><input type="checkbox" name="markVerified"><span>${T('fac.mark', 'The numbers in this file are already checked')}</span></label><div id="fi-out"></div>`,
+        actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('fac.check', 'Check, then import'), primary: true }],
+        onOpen: d => d.querySelector('#fi-f').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { text = String(fr.result || ''); }; fr.readAsText(f); }),
+        onSubmit: async d => {
+          if (!text) throw new MC.ApiError(400, { error: T('fac.pick', 'Choose the CSV file first') });
+          const dry = await api.post('/api/hq/facilities/import', { csv: text, dryRun: true });
+          const ok = await confirm({ title: T('fac.import_q', 'Import {n} rows?', { n: dry.results.filter(x => x.ok).length }), body: T('fac.import_b', '{c} new, {u} updated, {f} with problems (skipped).', { c: dry.results.filter(x => x.ok && x.action === 'create').length, u: dry.results.filter(x => x.ok && x.action === 'update').length, f: dry.failed }), ok: T('fac.import', 'Import a spreadsheet') });
+          if (!ok) return false;
+          return api.post('/api/hq/facilities/import', { csv: text, markVerified: !!d.markVerified });
+        } });
+      if (v) { toast(T('fac.imported', '{c} added, {u} updated', { c: v.created, u: v.updated }), 'ok'); MC.render(); }
+    });
+  }
+  form('fac-q', d => MC.go('#/facilities' + (d.q ? '?q=' + encodeURIComponent(d.q) : '')));
+  async function facSuggestions() {
+    const rows = await api.get('/api/hq/facility-suggestions');
+    view(html`<a class="back" href="#/facilities">${icon('left')}${T('fac.title', 'Public hospitals')}</a><div class="page-head"><div><h1>${T('fac.sugg_title', 'Corrections from providers')}</h1></div></div>
+      <section class="panel flush">${rows.length ? html`<ul class="list">${rows.map(s => html`<li><div class="grow"><span class="title">${s.facilityName}</span><span class="sub">${s.orgName} | ${s.byName} | ${dateTime(s.createdAt)}</span><span class="sub">${s.phone ? cap(s.phone.kind) + ': ' + s.phone.number + ' | ' : ''}${s.note}</span></div><span class="end">${s.phone ? html`<button class="btn sm primary" data-action="fs-do" data-a="apply" data-id="${s.id}">${T('fac.apply', 'Use this number')}</button>` : ''}<button class="btn sm" data-action="fs-do" data-a="dismiss" data-id="${s.id}">${T('fac.dismiss', 'Dismiss')}</button></span></li>`)}</ul>` : empty({ icon: 'check', title: T('fac.sugg_none', 'Nothing to review') })}</section>`);
+  }
+  on('fs-do', async el => { await api.post('/api/hq/facility-suggestions/' + el.dataset.id + '/' + el.dataset.a); MC.render(); });
+  async function marketPage() {
+    const m = await api.get('/api/hq/market');
+    view(html`<div class="page-head"><div><h1>${T('mkt.title', 'Patient marketplace')}</h1><p>${T('mkt.sub', 'Patients who pay for marketplace access, and the providers they find there. Prices are in Processes > Patient marketplace.')}</p></div><div class="actions"><a class="btn" href="#/config/process">${T('mkt.prices', 'Change prices')}</a></div></div>
+      <div class="figures"><div><b>${m.activeSubscribers}</b><span>${T('mkt.subs', 'Patients with access now')}</span></div><div><b>${money(m.revenue30dKobo)}</b><span>${T('mkt.rev', 'Paid in the last 30 days')}</span></div><div><b>${m.listedProviders}</b><span>${T('mkt.listed', 'Providers listed')}</span></div><div><b>${m.joins30d}</b><span>${T('mkt.joins', 'Registrations through the marketplace, 30 days')}</span></div></div>
+      <section class="panel"><h2>${T('mkt.by_plan', 'Access by length')}</h2><dl class="kv">${Object.entries(m.prices).map(([k, p]) => html`<dt>${cap(k)} (${money(p.amountKobo)})</dt><dd>${m.byPlan[k] || 0}</dd>`)}</dl></section>`);
+  }
+
   window.HQConfig = {
     routes: { '#/config': branding, '#/config/branding': branding, '#/config/content': content, '#/config/languages': languages, '#/config/features': features, '#/config/process': processes, '#/config/pricing': pricing, '#/config/roles': rolesPage, '#/config/catalog': catalog, '#/config/integrations': integrations, '#/config/history': history,
       '#/golive': golive, '#/compliance': compliancePage, '#/compliance/partners': partnersPage, '#/connectors': connectorsPage, '#/connectors/:id': connectorDetail,
-      '#/support': supportList, '#/support/:id': supportView },
+      '#/support': supportList, '#/support/:id': supportView, '#/facilities': facilitiesPage, '#/facilities/suggestions': facSuggestions, '#/marketplace': marketPage },
     nav: [
       { href: '#/config', label: MC.t('hq.nav.config', 'Configuration'), short: MC.t('hq.nav.config_s', 'Config'), icon: 'settings', perm: 'platform.read' },
       { href: '#/golive', label: MC.t('hq.nav.golive', 'Go-live checklist'), short: MC.t('hq.nav.golive_s', 'Go-live'), icon: 'check', perm: 'platform.read' },
       { href: '#/compliance', label: MC.t('hq.nav.compliance', 'Compliance and partners'), short: MC.t('hq.nav.compliance_s', 'Compliance'), icon: 'clipboard', perm: 'platform.read' },
       { href: '#/connectors', label: MC.t('hq.nav.connectors', 'Connectors'), icon: 'swap', perm: 'platform.read' },
+      { href: '#/marketplace', label: MC.t('hq.nav.marketplace', 'Patient marketplace'), short: MC.t('hq.nav.marketplace_s', 'Marketplace'), icon: 'globe', perm: 'platform.read' },
+      { href: '#/facilities', label: MC.t('hq.nav.facilities', 'Public hospitals'), icon: 'building', perm: 'platform.read' },
       { href: '#/support', label: MC.t('hq.nav.support', 'Support'), icon: 'message', perm: 'platform.support' }],
     featureLabel,
     settingsHref,

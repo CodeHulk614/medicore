@@ -48,14 +48,26 @@ const DEFAULTS = {
     ai: false, aiPatientAssistant: false, aiClinicianAssistant: false, aiLabExplainer: false, chw: true, onlinePayments: true, cashPayments: true, hmoClaims: true,
     languages: ['en', 'pcm', 'yo', 'ha', 'ig'], lowDataMode: false, maintenanceMode: false, maintenanceMessage: '',
     groups: true, referralNetwork: true, providerMessaging: true, providerDirectory: true,
+    /* collaborative marketplace */
+    wearables: true, marketplacePharmacy: true, careSharing: true, documents: true, inventory: true, publicFacilities: true, transfers: true, hmoRetail: true, hmoNetwork: true,
   },
   process: {
     security: { passwordMinLength: 8, sessionHours: 12, lockoutAttempts: 5, lockoutMinutes: 15, otpMinutes: 10, loginPerIpPer5Min: 150 },
     appointments: { patientCancelHours: 2, defaultSlotMinutes: 20, videoJoinEarlyMinutes: 15, videoJoinLateMinutes: 60, payBeforeVideo: true },
     pharmacy: { pickupWindowDays: 2, deliveryCodeAttempts: 5, requirePharmacistVerify: true, allowSubstitution: true },
     lab: { twoStepVerifyDefault: false, collectBeforePaymentForUrgent: true },
-    hmo: { preauthThresholdKobo: 5000000, duplicateWindowHours: 24, frequencyLimitPer30Days: 3 },
-    emergency: { publicPerIpPerHour: 5, sosRadiusKm: 40, locationFreshSeconds: 120 },
+    hmo: { preauthThresholdKobo: 5000000, duplicateWindowHours: 24, frequencyLimitPer30Days: 3, primaryChangeMinMonths: 6, maxDependants: 6, verifyCardAnyProvider: false,
+      /* patients with no HMO cover browse and buy any HMO's plans free (to get the uninsured insured); patients who already
+       * have cover need a marketplace subscription to compare and join other HMOs */
+      uninsuredBuyFree: true, otherHmosNeedSubscription: true },
+    /* SOS is open to every patient: no marketplace subscription and no registration with the ambulance service needed.
+     * The trip is billed to the patient's account by the service that went; the fallback tariff applies when that service
+     * has no ambulance prices set, and the booking fee is MediCore's own line on the bill (0 turns it off). */
+    emergency: { publicPerIpPerHour: 5, sosRadiusKm: 40, locationFreshSeconds: 120, patientChoosesService: true, fallbackCallKobo: 3000000, fallbackAlsKobo: 5500000, fallbackPerKmKobo: 60000, bookingFeeKobo: 150000 },
+    /* identity: patients are registered with a NIN before a provider onboards them (lib/identity.js). Staff may register
+     * without one only with a reason (a child, an emergency, not yet enrolled with NIMC). */
+    identity: { requireNin: true, allowNoNinWithReason: true, matchDob: true, showHmoBeforeConsent: true },
+    wearables: { requestExpiryMinutes: 30 },
     delivery: { riderLocationFreshSeconds: 120 },
     ai: { patientDailyMessages: 40, conversationRetentionDays: 90 },
     billing: { platformFeeKobo: 0, bankChargeKobo: 220000, showBankChargeToPatient: false },
@@ -63,11 +75,19 @@ const DEFAULTS = {
      *  mode 'provider' (default): a patient belongs to the providers that registered or approved them; the patient app
      *    shows one provider at a time (with a switcher), no platform-wide search, no record sharing between providers
      *    except through a referral.  mode 'open': platform-wide directory, booking anywhere, patient-controlled sharing. */
-    patients: { mode: 'provider', allowMultipleProviders: true, applicationsNeedApproval: true, crossProviderSharing: false, applicationExpiryDays: 30 },
+    patients: { mode: 'provider', freeFirstProvider: true, allowMultipleProviders: true, applicationsNeedApproval: true, crossProviderSharing: false, applicationExpiryDays: 30 },
     /* hospital groups with several branches */
     branches: { requireApproval: false, shareRecordsAcrossBranches: true, branchAdminsManageModules: false },
     /* provider-to-provider referral network */
     referrals: { requireConnection: false, requirePatientConsent: true, expireDays: 30, notifyPatient: true },
+    /* the patient marketplace: subscribers find, compare and use any listed provider; HMO members see their HMO's network free */
+    marketplace: { monthlyKobo: 250000, quarterlyKobo: 675000, annualKobo: 2500000, freeTrialDays: 0, hmoMembersSeeNetwork: true, autoRegisterOnUse: true, defaultRadiusKm: 15, showTeaser: true },
+    /* several providers caring for one patient at the same time */
+    careShare: { requirePatientConsent: true, allowCodeConsent: true, defaultDays: 180, maxDays: 730 },
+    /* scanned paper records, letters, certificates and signed forms */
+    documents: { maxFileMb: 3, maxFilesPerDocument: 10, patientUploads: true, patientSeesProviderScans: true },
+    /* emergency transfers to hospitals on or off MediCore */
+    transfers: { packHours: 72, packMaxViews: 20 },
   },
   /* modular pricing: every provider builds its own package. Monthly NGN prices, editable in HQ. */
   pricing: {
@@ -111,6 +131,10 @@ const DEFAULTS = {
     sms: { provider: 'termii' },
     africastalking: { username: '', apiKey: null, senderId: '' },
     customSms: { url: '', method: 'POST', contentType: 'json', headerName: 'Authorization', token: null, bodyTemplate: '', successStatus: 200 },
+    /* NIN checks through a licensed NIMC verification partner (lib/identity.js): dojah | prembly | custom | '' (off) */
+    identity: { provider: '', baseUrl: '', appId: '', apiKey: null, path: '', method: 'GET', headerName: 'Authorization', dataPath: 'data' },
+    /* wearable brands' cloud accounts through an aggregator (modules/wearables.js): terra | '' (off) */
+    wearables: { provider: '', baseUrl: 'https://api.tryterra.co/v2', devId: '', apiKey: null, webhookSecret: null },
   },
   /* compliance and partnership register (HQ > Compliance). An item with `enforce` on and status not 'done'
    * switches off the features it lists, so a capability cannot go live before its licence is in place. */
@@ -119,10 +143,12 @@ const DEFAULTS = {
       ndpc: { label: 'NDPC registration (data controller of major importance)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: [] },
       dpo: { label: 'Data Protection Officer appointed', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: [] },
       dpia: { label: 'Data protection impact assessment (DPIA)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: [] },
-      pcn: { label: 'PCN Electronic Pharmacy Aggregator registration', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: 'Needed before patients can order from pharmacies they are not registered with (open patient mode).', enforce: false, blocksFeatures: ['marketplace'] },
+      pcn: { label: 'PCN Electronic Pharmacy Aggregator registration', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: 'Needed before marketplace subscribers can order medicines from pharmacies they are not registered with.', enforce: false, blocksFeatures: ['marketplacePharmacy'] },
+      nhia: { label: 'NHIA accreditation of each HMO on the platform (checked at HMO onboarding)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: 'Ask every HMO for its NHIA accreditation before approving it in HQ.', enforce: false, blocksFeatures: [] },
       hefamaa: { label: 'HEFAMAA telemedicine registration (Lagos)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: ['videoVisits'] },
       paystackKyc: { label: 'Payment gateway business verification (KYC)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: [] },
       smsSender: { label: 'SMS sender ID approval', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: [] },
+      nimc: { label: 'NIN verification partner licensed by NIMC (account, API keys, data processing agreement)', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: 'Until this is in place, NINs are saved as pending and staff confirm them by hand.', enforce: false, blocksFeatures: [] },
       ussdCode: { label: 'USSD short code from an aggregator', status: 'not_started', reference: '', issuedOn: '', expiresOn: '', docUrl: '', owner: '', notes: '', enforce: false, blocksFeatures: ['ussd'] },
     },
     /* agreements with HMOs and other partners: { key: { name, kind, status, contact, email, phone, startsOn, endsOn, terms, docUrl, notes } } */
@@ -133,7 +159,7 @@ const DEFAULTS = {
 const SECRET_PATHS = ['integrations.whatsapp.appSecret', 'integrations.paystack.secretKey', 'integrations.termii.apiKey', 'integrations.turn.credential', 'integrations.ussd.secret', 'integrations.ai.apiKey', 'integrations.whatsapp.accessToken', 'integrations.whatsapp.verifyToken', 'integrations.email.apiKey',
   'integrations.flutterwave.secretKey', 'integrations.flutterwave.webhookHash', 'integrations.monnify.secretKey',
   'integrations.customPayment.auth.token', 'integrations.customPayment.auth.password', 'integrations.customPayment.auth.clientSecret', 'integrations.customPayment.webhook.secret',
-  'integrations.africastalking.apiKey', 'integrations.customSms.token'];
+  'integrations.africastalking.apiKey', 'integrations.customSms.token', 'integrations.identity.apiKey', 'integrations.wearables.apiKey', 'integrations.wearables.webhookSecret'];
 /* sections a per-provider override may change */
 const ORG_OVERRIDABLE = ['features', 'process', 'content'];
 
@@ -220,6 +246,8 @@ function applyIntegrations(eff) {
     monnify: { apiKey: i.monnify.apiKey || env.MONNIFY_KEY || '', secretKey: sec('integrations.monnify.secretKey') || env.MONNIFY_SECRET || '', contractCode: i.monnify.contractCode || env.MONNIFY_CONTRACT || '', baseUrl: i.monnify.baseUrl || 'https://api.monnify.com' },
     custom: (() => { const c = clone(i.customPayment); c.auth.token = sec('integrations.customPayment.auth.token'); c.auth.password = sec('integrations.customPayment.auth.password'); c.auth.clientSecret = sec('integrations.customPayment.auth.clientSecret'); c.webhook.secret = sec('integrations.customPayment.webhook.secret'); return c; })(),
   };
+  config.IDENTITY = { provider: i.identity.provider || env.NIN_PROVIDER || '', baseUrl: i.identity.baseUrl || env.NIN_BASE_URL || '', appId: i.identity.appId || env.NIN_APP_ID || '', apiKey: sec('integrations.identity.apiKey') || env.NIN_API_KEY || '',
+    path: i.identity.path || '', method: i.identity.method || 'GET', headerName: i.identity.headerName || 'Authorization', dataPath: i.identity.dataPath || 'data' };
   config.SMS = {
     provider: i.sms.provider || 'termii',
     africastalking: { username: i.africastalking.username || env.AT_USERNAME || '', apiKey: sec('integrations.africastalking.apiKey') || env.AT_API_KEY || '', senderId: i.africastalking.senderId || '' },
@@ -309,6 +337,9 @@ function publicConfig(app, org) {
     payments: { provider: eff.integrations.payments.provider, label: eff.integrations.payments.label || '', paystackPublicKey: eff.integrations.paystack.publicKey || process.env.PAYSTACK_PUBLIC || '' },
     referrals: { requirePatientConsent: (eff.process.referrals || {}).requirePatientConsent !== false, requireConnection: !!(eff.process.referrals || {}).requireConnection },
     patients: { mode: (eff.process.patients || {}).mode || 'provider', allowMultipleProviders: (eff.process.patients || {}).allowMultipleProviders !== false, crossProviderSharing: !!(eff.process.patients || {}).crossProviderSharing },
+    marketplace: (() => { const m = eff.process.marketplace || {}; return { monthlyKobo: m.monthlyKobo, quarterlyKobo: m.quarterlyKobo, annualKobo: m.annualKobo, freeTrialDays: m.freeTrialDays || 0, hmoMembersSeeNetwork: m.hmoMembersSeeNetwork !== false, defaultRadiusKm: m.defaultRadiusKm || 15, showTeaser: m.showTeaser !== false }; })(),
+    careShare: { requirePatientConsent: (eff.process.careShare || {}).requirePatientConsent !== false, allowCodeConsent: (eff.process.careShare || {}).allowCodeConsent !== false, defaultDays: (eff.process.careShare || {}).defaultDays || 180 },
+    documents: { maxFileMb: (eff.process.documents || {}).maxFileMb || 3, maxFilesPerDocument: (eff.process.documents || {}).maxFilesPerDocument || 10, patientUploads: (eff.process.documents || {}).patientUploads !== false },
   };
 }
 

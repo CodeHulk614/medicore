@@ -362,7 +362,7 @@
     const p = c.patient; const vit = c.vitals || [];
     const maxSys = Math.max(1, ...vit.map(v => v.bpSys || 0));
     view(html`${back('#/patients', T('pts.title', 'Patients'))}${MC.wristband(bandPatient(c))}
-      <div class="page-head"><div><h1>${p.name}</h1><p>${[p.mrn ? 'MRN ' + p.mrn : '', ageSex(p), p.phone].filter(Boolean).join(' | ')}</p></div><div class="actions"><button class="btn" data-action="msg-start" data-p="${p.id}" data-name="${p.name}">${icon('message')}${T('chart.message', 'Message patient')}</button>${refOK() && MC.referrals.canSend() ? html`<button class="btn" data-action="doc-refer" data-p="${p.id}">${icon('swap')}${T('chart.refer', 'Refer to another provider')}</button>` : ''}</div></div>
+      <div class="page-head"><div><h1>${p.name}</h1><p>${[p.mrn ? 'MRN ' + p.mrn : '', ageSex(p), p.phone].filter(Boolean).join(' | ')}</p></div><div class="actions"><button class="btn" data-action="msg-start" data-p="${p.id}" data-name="${p.name}">${icon('message')}${T('chart.message', 'Message patient')}</button>${refOK() && MC.referrals.canSend() ? html`<button class="btn" data-action="doc-refer" data-p="${p.id}">${icon('swap')}${T('chart.refer', 'Refer to another provider')}</button>` : ''}${MC.caretools.actions(p)}</div></div>
       <div class="notice">${c.sharing.note}</div>
       <div class="grid two">
         <section class="panel"><h2>${T('chart.demo', 'Demographics')}</h2><dl class="kv"><dt>${T('chart.dob', 'Date of birth')}</dt><dd>${p.dob || '-'}</dd><dt>${T('chart.blood', 'Blood group')}</dt><dd>${p.bloodGroup || '-'}</dd><dt>${T('chart.geno', 'Genotype')}</dt><dd>${p.genotype || '-'}</dd><dt>${T('vitals.weight', 'Weight')}</dt><dd>${p.weightKg ? p.weightKg + ' kg' : '-'}</dd><dt>${T('chart.address', 'Address')}</dt><dd>${p.address || '-'}</dd><dt>${T('chart.nok', 'Next of kin')}</dt><dd>${p.nokName ? p.nokName + (p.nokPhone ? ', ' + p.nokPhone : '') : '-'}</dd></dl></section>
@@ -379,7 +379,9 @@
       <section class="panel flush"><h2>${T('chart.rx', 'Prescriptions')}</h2>${c.prescriptions.length ? html`<ul class="list">${c.prescriptions.map(r => html`<li><div class="grow"><span class="title">${r.items.map(i => i.drugName + (i.doseText ? ' ' + i.doseText : '')).join(', ')}</span><span class="sub">${date(r.createdAt)} | ${r.prescriberName}${r.orgId !== MC.me.org.id ? ' | ' + T('chart.other', 'From {org}', { org: r.orgName }) : ''}</span></div>${sb(r.status)}</li>`)}</ul>` : empty({ icon: 'pill', title: T('chart.no_rx', 'No prescriptions') })}</section>
       <section class="panel"><h2>${T('chart.labs', 'Lab results')}</h2>${(c.labResults || []).length ? c.labResults.map(o => html`<div class="stack" style="margin-bottom:16px"><h3>${o.number} | ${o.lab ? o.lab.name : ''} | ${dateTime(o.releasedAt)} ${o.amended ? badge(T('chart.amended', 'Amended'), 'warn') : ''} ${o.critical && o.critical.has ? badge(T('chart.critical', 'Critical result'), 'bad') : ''}</h3>
         <div class="table-wrap"><table class="t stack-sm"><thead><tr><th>${T('chart.test', 'Test')}</th><th>${T('chart.result', 'Result')}</th><th>${T('chart.range', 'Reference')}</th><th>${T('chart.flag', 'Flag')}</th></tr></thead><tbody>
-          ${(o.results || []).map(r => html`<tr><td data-label="${T('chart.test', 'Test')}">${r.name}</td><td data-label="${T('chart.result', 'Result')}"><span class="${flagCls(r.critical ? 'critical' : r.flag)}">${r.value} ${r.unit || ''}</span></td><td data-label="${T('chart.range', 'Reference')}">${r.refRange || (r.range ? (r.range.low ?? '') + ' - ' + (r.range.high ?? '') : '')}</td><td data-label="${T('chart.flag', 'Flag')}">${r.critical ? html`<span class="flag-critical">${T('chart.f.critical', 'Critical')}</span>` : r.flag && r.flag !== 'normal' ? html`<span class="${flagCls(r.flag)}">${T('chart.f.' + r.flag, cap(r.flag))}</span>` : T('chart.f.normal', 'Normal')}</td></tr>`)}</tbody></table></div></div>`) : empty({ icon: 'flask', title: T('chart.no_labs', 'No released lab results') })}</section>`);
+          ${(o.results || []).map(r => html`<tr><td data-label="${T('chart.test', 'Test')}">${r.name}</td><td data-label="${T('chart.result', 'Result')}"><span class="${flagCls(r.critical ? 'critical' : r.flag)}">${r.value} ${r.unit || ''}</span></td><td data-label="${T('chart.range', 'Reference')}">${r.refRange || (r.range ? (r.range.low ?? '') + ' - ' + (r.range.high ?? '') : '')}</td><td data-label="${T('chart.flag', 'Flag')}">${r.critical ? html`<span class="flag-critical">${T('chart.f.critical', 'Critical')}</span>` : r.flag && r.flag !== 'normal' ? html`<span class="${flagCls(r.flag)}">${T('chart.f.' + r.flag, cap(r.flag))}</span>` : T('chart.f.normal', 'Normal')}</td></tr>`)}</tbody></table></div></div>`) : empty({ icon: 'flask', title: T('chart.no_labs', 'No released lab results') })}</section>
+      <div class="grid two">${MC.caretools.panels(p)}</div>`);
+    MC.caretools.load(p).catch(() => {});
   }
 
   /* ================= referrals ================= */
@@ -459,8 +461,10 @@
           <button class="btn lg" id="vc-mute" data-action="vc-mute" hidden aria-pressed="false">${T('vc.mute', 'Mute microphone')}</button>
           <button class="btn lg" id="vc-cam" data-action="vc-cam" hidden aria-pressed="false">${T('vc.cam_off', 'Turn camera off')}</button>
           <button class="btn danger lg" id="vc-end" data-action="vc-end" hidden>${icon('phone')}${T('vc.end', 'End call')}</button></div></section>
-      <p class="muted sm">${T('vc.help', 'The patient joins from the MediCore app. If the video does not connect on a weak network, end the call and phone the patient.')}</p>`);
+      <p class="muted sm">${T('vc.help', 'The patient joins from the MediCore app. If the video does not connect on a weak network, end the call and phone the patient.')}</p>
+      ${MC.feature('wearables') && MC.caretools && a.patientId ? html`<section class="panel" id="vc-wear"><h2>${T('vc.wear', 'Health devices')}</h2>${MC.skeleton(1)}</section>` : ''}`);
     MC.onLeave(() => endCall(true));
+    const wbox = document.getElementById('vc-wear'); if (wbox) MC.caretools.wearPanel(a.patientId, wbox, { poll: 10000 });
   }
   let vcAppt = null;
   const vMsg = (text, kind) => { const box = document.getElementById('vc-msg'); if (box) MC.view(text ? html`<div class="notice ${kind || ''}">${text}</div>` : '', box); };
@@ -592,9 +596,12 @@
       { href: '#/schedule', label: T('nav.schedule', 'Schedule'), icon: 'calendar' },
       { href: '#/earnings', label: T('nav.earnings', 'Earnings'), icon: 'chart' },
       MC.referrals.navItem(),
+      MC.caretools.nav.shares({ sideOnly: true }),
+      MC.caretools.nav.transfers({ sideOnly: true }),
     ],
     routes: { '#/today': today, '#/consult/:id': consult, '#/patients': patients, '#/chart/:id': chartPage, '#/messages': messages, '#/thread/:id': thread, '#/video/:id': videoPage, '#/schedule': schedule, '#/earnings': earnings,
-      ...MC.referrals.routes('#/referrals', { patientHref: pid => '#/chart/' + pid }) },
-    onReady: async () => { MC.referrals.refreshCount(); try { const r = await api.get('/api/msg/threads?status=open'); setTimeout(() => MC.navCount('#/messages', r.unreadTotal), 0); } catch (e) { } },
+      ...MC.referrals.routes('#/referrals', { patientHref: pid => '#/chart/' + pid }),
+      ...MC.caretools.routes({ patientHref: pid => '#/chart/' + pid }) },
+    onReady: async () => { MC.referrals.refreshCount(); MC.caretools.refreshCount(); try { const r = await api.get('/api/msg/threads?status=open'); setTimeout(() => MC.navCount('#/messages', r.unreadTotal), 0); } catch (e) { } },
   });
 })();

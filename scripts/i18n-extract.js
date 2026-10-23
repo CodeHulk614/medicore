@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..', 'public');
-const files = [path.join(root, 'assets', 'mc.js'), path.join(root, 'assets', 'referrals.js'), path.join(root, 'assets', 'whatsapp.js')].concat(fs.readdirSync(path.join(root, 'apps')).filter(f => f.endsWith('.js')).map(f => path.join(root, 'apps', f)));
+const files = [path.join(root, 'assets', 'mc.js'), path.join(root, 'assets', 'referrals.js'), path.join(root, 'assets', 'whatsapp.js'), path.join(root, 'assets', 'caretools.js'), path.join(root, 'assets', 'patient-market.js')].concat(fs.readdirSync(path.join(root, 'apps')).filter(f => f.endsWith('.js')).map(f => path.join(root, 'apps', f)));
 const STR = "'((?:[^'\\\\]|\\\\.)*)'";
 const out = {}; const dup = [];
 for (const f of files) {

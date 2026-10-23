@@ -103,7 +103,7 @@ const prov = perm => A.requireStaff({ perm, module: 'hmo' });
 function patientCoverView(c, payerName) {
   return { id: c.id, payerOrgId: c.payerOrgId, payerName: payerName || null, memberNo: c.memberNo, planName: c.planName || null, status: c.status,
     patientConfirmed: !!c.patientConfirmed, payerVerified: !!c.payerVerified, enrolledBy: c.enrolledBy, limits: c.limits || null, usedKobo: c.usedKobo || null,
-    remainingKobo: c.limits ? remainingOf(c) : null, validTo: c.validTo || null, statusReason: c.statusReason || null, createdAt: c.createdAt };
+    remainingKobo: c.limits ? remainingOf(c) : null, validTo: c.validTo || null, statusReason: c.statusReason || null, createdAt: c.createdAt, planId: c.planId || null, principalCoverageId: c.principalCoverageId || null, relation: c.relation || 'self', primaryOrgId: c.primaryOrgId || null };
 }
 async function payerCoverView(c) {
   let member;

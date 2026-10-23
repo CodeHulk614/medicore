@@ -139,7 +139,7 @@ test('metrics', async () => {
 test('privacy: request handling and deletion as anonymisation', async () => {
   const pc = h.client('patient');
   const s = await pc.post('/api/patients/register/start', { phone: '08062223333' });
-  await pc.post('/api/patients/register', { phone: '08062223333', code: s.body.devCode, firstName: 'Delete', lastName: 'Me', password: 'Delete2026x', consent: true });
+  await pc.post('/api/patients/register', { phone: '08062223333', code: s.body.devCode, firstName: 'Delete', lastName: 'Me', password: 'Delete2026x', consent: true, nin: '23334445556' });
   const req1 = await pc.post('/api/me/privacy-request', { type: 'delete', note: 'Please delete' });
   const rid = req1.body.request.id; const pid = (await pc.get('/api/me/profile')).body.id;
   assert.equal((await dev.get('/api/hq/privacy/requests')).status, 403, 'developer lacks privacy');

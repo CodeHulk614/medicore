@@ -116,7 +116,45 @@
     }
     return data;
   }
-  const api = { get: p => request('GET', p), post: (p, b) => request('POST', p, b === undefined ? {} : b), patch: (p, b) => request('PATCH', p, b), put: (p, b) => request('PUT', p, b), del: p => request('DELETE', p),
+  /** a file from the API (documents, signatures) as a blob: URL the page can show or open. Revoke when done. */
+  async function blobUrl(path) {
+    let r; try { r = await fetch(path, { credentials: 'same-origin', headers: Object.assign({ 'X-MC-App': APP === 'register' ? (document.body.dataset.apiApp || 'patient') : APP, 'X-MC-Lang': lang }, extraHeaders) }); } catch (e) { throw new ApiError(0, { error: t('kit.err.network', 'Could not reach MediCore. Check your connection and try again.'), code: 'network' }); }
+    if (!r.ok) { let d = null; try { d = await r.json(); } catch (e) { d = null; } throw new ApiError(r.status, d); }
+    const b = await r.blob(); const u = URL.createObjectURL(b); onLeave(() => URL.revokeObjectURL(u)); return { url: u, type: b.type, size: b.size };
+  }
+  /** read a picked file for upload: photos are shrunk to about 1800 px and sent as JPEG; PDFs as they are */
+  function readUpload(file, maxPx) {
+    return new Promise((resolve, reject) => {
+      if (!file) return reject(new Error(t('kit.file_none', 'Choose a file first')));
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error(t('kit.file_read', 'Could not read that file')));
+      if (file.type === 'application/pdf') { fr.onload = () => resolve({ name: file.name, mime: 'application/pdf', data: fr.result, size: file.size }); fr.readAsDataURL(file); return; }
+      if (!/^image\//.test(file.type)) return reject(new Error(t('kit.file_type', 'Choose a photo or a PDF')));
+      fr.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const m = maxPx || 1800; let w = img.naturalWidth, h = img.naturalHeight; const k = Math.min(1, m / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+          const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+          const data = c.toDataURL('image/jpeg', 0.8); resolve({ name: (file.name || 'photo').replace(/\.[a-z0-9]+$/i, '') + '.jpg', mime: 'image/jpeg', data, size: Math.round(data.length * 0.75) });
+        };
+        img.onerror = () => reject(new Error(t('kit.file_read', 'Could not read that file')));
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  /** a signature box: signaturePad(canvas) -> { empty(), clear(), toDataURL() } */
+  function signaturePad(c) {
+    const g = c.getContext('2d'); let drawing = false; let strokes = 0; let last = null;
+    const fit = () => { const r = c.getBoundingClientRect(); const ratio = window.devicePixelRatio || 1; c.width = Math.max(1, Math.round(r.width * ratio)); c.height = Math.max(1, Math.round(r.height * ratio)); g.setTransform(ratio, 0, 0, ratio, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, r.width, r.height); g.lineWidth = 2.4; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = '#111'; };
+    fit();
+    const pos = e => { const r = c.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    c.addEventListener('pointerdown', e => { drawing = true; last = pos(e); c.setPointerCapture(e.pointerId); e.preventDefault(); });
+    c.addEventListener('pointermove', e => { if (!drawing) return; const p = pos(e); g.beginPath(); g.moveTo(last.x, last.y); g.lineTo(p.x, p.y); g.stroke(); last = p; strokes++; e.preventDefault(); });
+    const end = () => { drawing = false; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+    return { empty: () => strokes < 8, clear: () => { strokes = 0; fit(); }, toDataURL: () => c.toDataURL('image/png') };
+  }
+  const api = { get: p => request('GET', p), post: (p, b) => request('POST', p, b === undefined ? {} : b), patch: (p, b) => request('PATCH', p, b), put: (p, b) => request('PUT', p, b), del: p => request('DELETE', p), blobUrl: p => blobUrl(p),
     header: (name, value) => { if (value == null || value === '') delete extraHeaders[name]; else extraHeaders[name] = String(value); } };
   const qs = o => { const s = Object.entries(o || {}).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&'); return s ? '?' + s : ''; };
 
@@ -277,6 +315,8 @@
   async function render() {
     while (cleanups.length) { try { cleanups.pop()(); } catch (e) { } }
     document.querySelectorAll('dialog.dlg').forEach(d => d.dispatchEvent(new Event('cancel')));  // leaving a page closes its dialogs
+    // a hash change can arrive while the page is still starting (language file loading): start() renders once the shell exists
+    if (!(mainEl || document.getElementById('main'))) return;
     const { path, query } = parseHash();
     const r = routes.find(x => x.re.test(path)) || routes.find(x => x.pattern === boot.home);
     if (!r) return;
@@ -331,7 +371,7 @@
     const m = L.map(el, { zoomControl: true, attributionControl: true }).setView([center ? center.lat : 6.5244, center ? center.lng : 3.3792], zoom || 13);
     L.tileLayer(mapCfg.tileUrl, { maxZoom: 19, attribution: mapCfg.attribution }).addTo(m);
     const markers = {}; const lines = {};
-    const colors = { unit: '#B42D27', patient: '#0F6B6E', rider: '#9A5B00', hospital: '#3D4FA6', me: '#1F5FA8' };
+    const colors = { unit: '#B42D27', patient: '#0F6B6E', rider: '#9A5B00', hospital: '#3D4FA6', me: '#1F5FA8', clinic: '#3D4FA6', pharmacy: '#1E7A4C', lab: '#6B3FA0', ambulance: '#B42D27', public: '#5B6B6A', other: '#3C5457' };
     const api2 = {
       leaflet: m,
       setMarker(key, pos, o = {}) {
@@ -340,10 +380,13 @@
         if (markers[key]) { markers[key].setLatLng(ll); if (o.label) markers[key].setTooltipContent(esc(o.label)); return; }
         markers[key] = L.circleMarker(ll, { radius: o.kind === 'unit' || o.kind === 'rider' ? 9 : 7, color: o.stale ? (o.color || colors[o.kind] || '#3C5457') : '#fff', weight: 2, fillColor: o.color || colors[o.kind] || '#3C5457', fillOpacity: o.stale ? 0.15 : 1 }).addTo(m);
         if (o.label) markers[key].bindTooltip(esc(o.label), { permanent: !!o.permanent, direction: 'top' });
+        if (o.onClick) markers[key].on('click', () => o.onClick(key));
       },
+      center(pos, z) { if (gone || !pos) return; m.setView([pos.lat, pos.lng], z || m.getZoom()); },
+      clear() { Object.keys(markers).forEach(k => { m.removeLayer(markers[k]); delete markers[k]; }); },
       remove(key) { if (markers[key]) { m.removeLayer(markers[key]); delete markers[key]; } },
       line(key, pts) { if (gone) return; if (lines[key]) m.removeLayer(lines[key]); if (pts && pts.length > 1) lines[key] = L.polyline(pts.map(p => [p.lat, p.lng]), { color: '#0F6B6E', weight: 4, opacity: .7 }).addTo(m); },
-      fit() { if (gone || !el.isConnected) return; const all = Object.values(markers).map(x => x.getLatLng()); if (all.length > 1) m.fitBounds(L.latLngBounds(all).pad(0.25)); else if (all.length === 1) m.setView(all[0], 15); },
+      fit() { if (gone || !el.isConnected) return; m.invalidateSize(); const all = Object.values(markers).map(x => x.getLatLng()); if (all.length > 1) m.fitBounds(L.latLngBounds(all).pad(0.25)); else if (all.length === 1) m.setView(all[0], 15); },
       destroy() { if (gone) return; gone = true; try { m.remove(); } catch (e) { /* already removed */ } },
     };
     onLeave(() => api2.destroy());
@@ -533,5 +576,5 @@
   }
 
   window.MC = { APP, html, raw, esc, icon, api, qs, ApiError, money, date, time, dateTime, day, ago, mins, age, cap, initials, todayISO, badge, statusBadge, empty, skeleton, wristband, alerts, steps, figures,
-    toast, showError, dialog, confirm, on, form, t, setLang, get lang() { return lang; }, LANGS, langOptions, content, feature, config, formData, view, go, route, render, onLeave, poll, position, watchPosition, map, navCount, boot, refreshShift: renderShift, onEvent, emit, me: null };
+    toast, showError, dialog, confirm, on, form, t, setLang, get lang() { return lang; }, LANGS, langOptions, content, feature, config, formData, view, go, route, render, onLeave, poll, position, watchPosition, map, navCount, boot, readUpload, signaturePad, refreshShift: renderShift, onEvent, emit, me: null };
 })();

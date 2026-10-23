@@ -19,6 +19,7 @@ const EVENTS = {
   'payment.success': 'An online payment was confirmed', 'bill.paid': 'A bill was fully paid',
   'org.signup': 'A provider signed up', 'org.approved': 'A provider was approved', 'group.branch_created': 'A group added a branch',
   'claim.submitted': 'An HMO claim was submitted',
+  'market.subscribed': 'A patient paid for marketplace access', 'hmo.premium_paid': 'A member paid an HMO premium online', 'careshare.active': 'Two providers started sharing a patient\'s care',
 };
 db.index('connector_deliveries', ['connectorId', 'at']);
 

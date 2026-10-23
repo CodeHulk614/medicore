@@ -54,12 +54,21 @@ const PERMS = {
   'chw.field': 'Community visits',
   // payer
   'payer.members': 'Manage members and cover', 'payer.preauth': 'Decide pre-authorisations', 'payer.claims': 'Review claims', 'payer.pay': 'Mark claims paid',
+  'payer.plans': 'Manage HMO plans and online sales', 'payer.network': 'Manage the HMO provider network and capitation', 'payer.care': 'Answer member requests',
   // referral network (provider to provider)
   'referral.send': 'Refer patients to other providers', 'referral.receive': 'Receive and accept referrals', 'network.manage': 'Partner connections, network profile and provider messages',
   // patient applications (patients asking to join this provider)
   'patient.applications': 'Approve or decline patient applications',
   // WhatsApp inbox (chats on the provider's WhatsApp numbers)
   'whatsapp.inbox': 'Read and answer WhatsApp chats for their department',
+  // shared care (several providers working on one patient)
+  'careshare.manage': 'Share a patient with another provider and join care teams',
+  // documents (scanned paper records, letters, signed forms)
+  'docs.upload': 'Scan and upload paper records', 'docs.read': 'View patient documents', 'docs.issue': 'Issue medical reports, sick notes and letters', 'docs.forms': 'Fill and sign consent forms with patients',
+  // stores and capacity
+  'inventory.read': 'View stores and stock', 'inventory.manage': 'Manage store items, receive and count stock', 'inventory.issue': 'Issue stock from the store', 'capacity.update': 'Update beds and emergency availability',
+  // emergency transfers to hospitals on or off MediCore
+  'transfer.manage': 'Find hospitals and arrange emergency transfers',
   // admin
   'admin.staff': 'Manage staff', 'admin.settings': 'Provider settings and price list', 'admin.reports': 'Reports and analytics',
   'admin.audit': 'View audit log', 'admin.finance': 'Payouts and finance', 'admin.privacy': 'Handle patient data requests',
@@ -68,26 +77,27 @@ const PERMS = {
 /* Roles: default permissions, which app they use, which module they need, and whether they clock in. */
 const ROLES = {
   owner: { label: 'Owner / administrator', app: 'admin', module: null, clock: false, perms: Object.keys(PERMS).filter(p => !p.startsWith('payer.')) },
-  admin: { label: 'Administrator', app: 'admin', module: null, clock: false, perms: ['admin.staff', 'admin.settings', 'admin.reports', 'admin.audit', 'admin.finance', 'admin.privacy', 'patient.read', 'billing.void', 'referral.send', 'referral.receive', 'network.manage', 'patient.applications', 'whatsapp.inbox'] },
-  receptionist: { label: 'Receptionist', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'queue.manage', 'hmo.check', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox'] },
+  admin: { label: 'Administrator', app: 'admin', module: null, clock: false, perms: ['admin.staff', 'admin.settings', 'admin.reports', 'admin.audit', 'admin.finance', 'admin.privacy', 'patient.read', 'billing.void', 'referral.send', 'referral.receive', 'network.manage', 'patient.applications', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload', 'docs.forms', 'inventory.read', 'inventory.manage', 'inventory.issue', 'capacity.update', 'transfer.manage'] },
+  receptionist: { label: 'Receptionist', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'queue.manage', 'hmo.check', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload', 'docs.forms', 'transfer.manage'] },
   cashier: { label: 'Cashier / billing', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.read', 'billing.create', 'billing.cash', 'hmo.check', 'hmo.claim', 'whatsapp.inbox'] },
-  records: { label: 'Records officer', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'vitals.record', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox'] },
-  nurse: { label: 'Nurse (triage)', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.read', 'queue.manage', 'vitals.record', 'referral.send', 'whatsapp.inbox'] },
-  care: { label: 'Customer care', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.read', 'care.manage', 'referral.receive', 'whatsapp.inbox'] },
-  frontdesk_manager: { label: 'Front desk manager', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'queue.manage', 'vitals.record', 'billing.create', 'billing.cash', 'billing.void', 'care.manage', 'hmo.check', 'hmo.claim', 'referral.send', 'referral.receive', 'patient.applications', 'network.manage', 'whatsapp.inbox'] },
-  doctor: { label: 'Doctor', app: 'doctor', module: 'clinic', clock: true, perms: ['patient.read', 'clinic.consult', 'clinic.prescribe', 'clinic.order_lab', 'vitals.record', 'referral.send'] },
-  pharmacist: { label: 'Pharmacist', app: 'pharmacy', module: 'pharmacy', clock: true, perms: ['patient.read', 'patient.register', 'pharmacy.verify', 'pharmacy.dispense', 'pharmacy.stock', 'billing.create', 'billing.cash', 'hmo.check', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox'] },
+  records: { label: 'Records officer', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'vitals.record', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload', 'docs.forms'] },
+  nurse: { label: 'Nurse (triage)', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.read', 'queue.manage', 'vitals.record', 'referral.send', 'whatsapp.inbox', 'docs.read', 'docs.forms', 'inventory.read', 'inventory.issue', 'capacity.update', 'transfer.manage'] },
+  care: { label: 'Customer care', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.read', 'care.manage', 'referral.receive', 'whatsapp.inbox', 'docs.read'] },
+  frontdesk_manager: { label: 'Front desk manager', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['patient.register', 'patient.read', 'queue.manage', 'vitals.record', 'billing.create', 'billing.cash', 'billing.void', 'care.manage', 'hmo.check', 'hmo.claim', 'referral.send', 'referral.receive', 'patient.applications', 'network.manage', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload', 'docs.forms', 'inventory.read', 'inventory.manage', 'inventory.issue', 'capacity.update', 'transfer.manage'] },
+  doctor: { label: 'Doctor', app: 'doctor', module: 'clinic', clock: true, perms: ['patient.read', 'clinic.consult', 'clinic.prescribe', 'clinic.order_lab', 'vitals.record', 'referral.send', 'careshare.manage', 'docs.read', 'docs.upload', 'docs.issue', 'docs.forms', 'transfer.manage', 'inventory.read'] },
+  pharmacist: { label: 'Pharmacist', app: 'pharmacy', module: 'pharmacy', clock: true, perms: ['patient.read', 'patient.register', 'pharmacy.verify', 'pharmacy.dispense', 'pharmacy.stock', 'billing.create', 'billing.cash', 'hmo.check', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload'] },
   pharmacy_tech: { label: 'Pharmacy technician', app: 'pharmacy', module: 'pharmacy', clock: true, perms: ['patient.read', 'patient.register', 'pharmacy.dispense', 'pharmacy.stock', 'billing.create', 'billing.cash', 'referral.send', 'whatsapp.inbox'] },
   delivery_dispatcher: { label: 'Delivery dispatcher', app: 'pharmacy', module: 'delivery', clock: true, perms: ['delivery.dispatch', 'whatsapp.inbox'] },
   rider: { label: 'Delivery rider', app: 'rider', module: 'delivery', clock: true, perms: ['delivery.ride'] },
-  ambulance_dispatcher: { label: 'Ambulance dispatcher', app: 'dispatch', module: 'ambulance', clock: true, perms: ['ambulance.dispatch', 'ambulance.fleet', 'patient.read', 'referral.send', 'referral.receive', 'whatsapp.inbox'] },
+  ambulance_dispatcher: { label: 'Ambulance dispatcher', app: 'dispatch', module: 'ambulance', clock: true, perms: ['ambulance.dispatch', 'ambulance.fleet', 'patient.read', 'referral.send', 'referral.receive', 'whatsapp.inbox', 'inventory.read', 'inventory.manage', 'inventory.issue', 'transfer.manage', 'docs.read'] },
   crew: { label: 'Ambulance crew', app: 'crew', module: 'ambulance', clock: true, perms: ['ambulance.crew'] },
-  lab_scientist: { label: 'Lab scientist', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'lab.receive', 'lab.result', 'lab.verify', 'referral.send', 'whatsapp.inbox'] },
-  lab_reception: { label: 'Lab sample reception', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'patient.register', 'lab.receive', 'billing.create', 'billing.cash', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox'] },
-  lab_manager: { label: 'Lab manager', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'patient.register', 'lab.receive', 'lab.result', 'lab.verify', 'lab.catalog', 'billing.create', 'billing.cash', 'referral.send', 'referral.receive', 'patient.applications', 'network.manage', 'whatsapp.inbox'] },
+  lab_scientist: { label: 'Lab scientist', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'lab.receive', 'lab.result', 'lab.verify', 'referral.send', 'whatsapp.inbox', 'docs.read', 'inventory.read', 'inventory.issue'] },
+  lab_reception: { label: 'Lab sample reception', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'patient.register', 'lab.receive', 'billing.create', 'billing.cash', 'referral.send', 'referral.receive', 'patient.applications', 'whatsapp.inbox', 'docs.read', 'docs.upload', 'inventory.read'] },
+  lab_manager: { label: 'Lab manager', app: 'lab', module: 'lab', clock: true, perms: ['patient.read', 'patient.register', 'lab.receive', 'lab.result', 'lab.verify', 'lab.catalog', 'billing.create', 'billing.cash', 'referral.send', 'referral.receive', 'patient.applications', 'network.manage', 'whatsapp.inbox', 'careshare.manage', 'docs.read', 'docs.upload', 'inventory.read', 'inventory.manage', 'inventory.issue'] },
   chw: { label: 'Community health worker', app: 'chw', module: 'chw', clock: true, perms: ['chw.field', 'patient.register', 'referral.send'] },
-  payer_officer: { label: 'HMO officer', app: 'payer', module: 'payer', clock: false, perms: ['payer.members', 'payer.preauth', 'payer.claims'] },
-  payer_manager: { label: 'HMO manager', app: 'payer', module: 'payer', clock: false, perms: ['payer.members', 'payer.preauth', 'payer.claims', 'payer.pay', 'admin.staff', 'admin.reports', 'admin.audit', 'admin.settings'] },
+  store_officer: { label: 'Store officer', app: 'frontdesk', module: 'frontdesk', clock: true, perms: ['inventory.read', 'inventory.manage', 'inventory.issue', 'capacity.update'] },
+  payer_officer: { label: 'HMO officer', app: 'payer', module: 'payer', clock: false, perms: ['payer.members', 'payer.preauth', 'payer.claims', 'payer.care'] },
+  payer_manager: { label: 'HMO manager', app: 'payer', module: 'payer', clock: false, perms: ['payer.members', 'payer.preauth', 'payer.claims', 'payer.pay', 'admin.staff', 'admin.reports', 'admin.audit', 'admin.settings', 'payer.plans', 'payer.network', 'payer.care'] },
 };
 // HMO orgs use the admin app too, via their manager role
 ROLES.payer_manager.alsoApps = ['admin'];

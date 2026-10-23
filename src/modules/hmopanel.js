@@ -264,7 +264,9 @@ async function exportOrg(orgId) {
     staff: members.map(m => { const u = users.find(x => x.id === m.userId) || {}; return { name: u.name, email: u.email || null, phone: u.phone || null, role: m.role, status: m.status, since: m.createdAt }; }),
     patients: patients.map(p => P.staffView(p, byP[p.id])),
   };
-  for (const [name, f] of Object.entries({ appointments: { orgId }, encounters: { orgId }, prescriptions: { orgId }, vitals: { orgId }, bills: { orgId }, payments: { orgId }, rx_orders: { pharmacyOrgId: orgId }, deliveries: { orgId }, lab_orders: { $or: [{ labOrgId: orgId }, { referringOrgId: orgId }] }, incidents: { orgId }, referrals: { $or: [{ fromOrgId: orgId }, { toOrgId: orgId }] }, services: { orgId }, external_covers: { orgId }, external_preauths: { orgId }, external_claim_batches: { orgId }, hmo_panel: { orgId } })) out[name] = strip(await db.col(name).find(f, { limit: 100000 }));
+  for (const [name, f] of Object.entries({ appointments: { orgId }, encounters: { orgId }, prescriptions: { orgId }, vitals: { orgId }, bills: { orgId }, payments: { orgId }, rx_orders: { pharmacyOrgId: orgId }, deliveries: { orgId }, lab_orders: { $or: [{ labOrgId: orgId }, { referringOrgId: orgId }] }, incidents: { orgId }, referrals: { $or: [{ fromOrgId: orgId }, { toOrgId: orgId }] }, services: { orgId }, external_covers: { orgId }, external_preauths: { orgId }, external_claim_batches: { orgId }, hmo_panel: { orgId }, care_shares: { $or: [{ fromOrgId: orgId }, { toOrgId: orgId }] }, store_items: { orgId }, store_moves: { orgId }, transfers: { fromOrgId: orgId }, form_templates: { orgId }, hmo_network: { orgId }, capitation_payments: { orgId } })) out[name] = strip(await db.col(name).find(f, { limit: 100000 }));
+  // documents: the list with file references (download the files from the app; they are not inlined here)
+  out.documents = strip(await db.col('documents').find({ orgId }, { limit: 100000 }));
   return out;
 }
 router.get('/admin/export', A.requireStaff({ anyPerm: ['admin.privacy', 'admin.settings'] }), ah(async (req, res) => {

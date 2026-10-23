@@ -398,7 +398,10 @@ router.post('/me/prescriptions/:id/send', A.requirePatient, ah(async (req, res) 
   if (!rx) throw notFound('Prescription not found');
   if (rx.status !== 'active' || rx.routedTo) throw conflict(rx.status === 'cancelled' ? 'This prescription was cancelled by the prescriber' : 'This prescription has already been sent to a pharmacy', 'already_sent');
   // provider mode: the patient's own providers, or pharmacies their prescriber works with (same group or network partner)
-  if (!(await P.patientCanUse(req, b.pharmacyOrgId)) && !(await require('../network').arePartners(rx.orgId, b.pharmacyOrgId))) throw forbidden('Choose a pharmacy of your provider or one it works with.');
+  const partner = await require('../network').arePartners(rx.orgId, b.pharmacyOrgId);
+  if (!(await P.patientCanUse(req, b.pharmacyOrgId)) && !partner) throw forbidden('Choose a pharmacy of your provider or one it works with.');
+  // a pharmacy reached only through the marketplace needs the marketplace pharmacy switch (PCN e-pharmacy registration)
+  if (!partner && !(await P.linkOf(b.pharmacyOrgId, req.ctx.patient.id)) && !require('../market').pharmacyOrdersAllowed()) throw forbidden('Ordering medicines from pharmacies you are not registered with is not available yet. Visit the pharmacy, or send it to your own provider\'s pharmacy.');
   const order = await createOrderFromPrescription({ prescription: rx, pharmacyOrgId: b.pharmacyOrgId, fulfilment: b.fulfilment, address: b.address || (b.fulfilment === 'delivery' ? req.ctx.patient.address : null), location: b.location || null, requestedBy: 'patient' });
   await audit(req, 'patient.rx_send', { type: 'rx_order', id: order.id, patientId: order.patientId, orgId: order.pharmacyOrgId }, { fulfilment: b.fulfilment, prescriptionId: rx.id });
   res.json(await patientOrderView(order));

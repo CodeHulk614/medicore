@@ -145,7 +145,7 @@ async function createClient(req, rec, d) {
       return { id: c.id, status: 'link_requested', extra: Object.assign({ message: 'This person already has a MediCore record. They have been sent a code by SMS; enter it to link them.' }, extra) };
     }
   }
-  const p = { id: id('pat'), firstName: d.firstName, lastName: d.lastName, dob: d.dob || null, sex: d.sex || 'unknown', phone: d.phone || undefined, email: null, address: household ? household.address : null, homeLoc: loc(rec),
+  const p = { id: id('pat'), uid: P.newUid(), firstName: d.firstName, lastName: d.lastName, dob: d.dob || null, sex: d.sex || 'unknown', phone: d.phone || undefined, email: null, address: household ? household.address : null, homeLoc: loc(rec),
     bloodGroup: null, genotype: null, weightKg: null, nokName: null, nokPhone: null, allergies: [], noKnownAllergies: !!d.noKnownAllergies, conditions: [], status: 'active', createdAt: now(), createdVia: 'chw', createdByOrg: orgId, userId: null };
   if (!p.phone) delete p.phone;
   try { await db.col('patients').insertOne(p); } catch (e) { if (e.code === 11000) throw new RecErr('This phone number was registered a moment ago. Sync again.', 'retry'); throw e; }
@@ -390,7 +390,7 @@ async function seedDemo(ctx) {
   const hh = { id: id('hh'), orgId, chwUserId: chw.user.id, chwMembershipId: chw.membership.id, assignedTo: [], clientRef: 'demo-hh-' + id('x').slice(2), name: 'Okonkwo household', address: '7 Lawanson Rd, Surulere', area: 'Lawanson', ward: 'Ward C', lga: 'Surulere', phone: null, members: 5, loc: { lat: 6.5002, lng: 3.3488 }, recordedAt: t0, createdAt: t0 };
   await db.col('chw_households').insertOne(hh);
   const mk = async (first, last, dob, sex, extra) => {
-    const p = { id: id('pat'), firstName: first, lastName: last, dob, sex, email: null, address: hh.address, homeLoc: hh.loc, bloodGroup: null, genotype: null, weightKg: null, nokName: null, nokPhone: null, allergies: [], noKnownAllergies: true, conditions: [], status: 'active', createdAt: t0, createdVia: 'chw', createdByOrg: orgId, userId: null, consent: { version: config.PRIVACY_NOTICE_VERSION, accepted: true, at: t0, channel: 'chw:' + orgId } };
+    const p = { id: id('pat'), uid: P.newUid(), firstName: first, lastName: last, dob, sex, email: null, address: hh.address, homeLoc: hh.loc, bloodGroup: null, genotype: null, weightKg: null, nokName: null, nokPhone: null, allergies: [], noKnownAllergies: true, conditions: [], status: 'active', createdAt: t0, createdVia: 'chw', createdByOrg: orgId, userId: null, consent: { version: config.PRIVACY_NOTICE_VERSION, accepted: true, at: t0, channel: 'chw:' + orgId } };
     await db.col('patients').insertOne(p);
     await P.ensureLink(orgId, p.id, chw.user.id, 'chw');
     const c = Object.assign({ id: id('cc'), orgId, chwUserId: chw.user.id, chwMembershipId: chw.membership.id, assignedTo: [], clientRef: 'demo-cc-' + id('x').slice(2), householdId: hh.id, relationship: null, firstName: first, lastName: last, dob, sex, pregnant: false, lmp: null, loc: hh.loc, recordedAt: t0, createdAt: t0, patientId: p.id, status: 'active', via: 'registered' }, extra || {});

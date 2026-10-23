@@ -1,4 +1,7 @@
 'use strict';
+/* demo NINs: '2' + the last 10 digits of the phone, confirmed by the mock NIN partner (lib/identity.js) */
+const demoNinOf = phone => phone ? '2' + String(phone).replace(/\D/g, '').slice(-10) : null;
+function demoNin(phone) { const n = demoNinOf(phone); if (!n) return {}; return { ninHash: require('../lib/identity').ninHash(n), ninLast4: n.slice(-4), ninStatus: 'verified', ninCheckedAt: Date.now(), ninProvider: 'mock' }; }
 /*
  * Demo data, loaded ONLY when DEMO_MODE=1 (never in production).
  * Shows every package working on its own:
@@ -91,9 +94,10 @@ async function load() {
   await db.col('memberships').insertOne({ id: id('mem'), userId: ctx.staff.hospital['dr.bisi'].user.id, orgId: ctx.orgs.clinic.id, role: 'doctor', extraPerms: [], removedPerms: [], status: 'active', isOwner: false, createdAt: now(), createdBy: 'demo' });
 
   for (const p of PATIENTS) {
-    const doc = { id: id('pat'), firstName: p.firstName, lastName: p.lastName, dob: p.dob, sex: p.sex, phone: p.phone, phoneVerified: true, email: p.email || null, address: p.address, homeLoc: p.homeLoc, bloodGroup: p.bloodGroup, genotype: p.genotype, weightKg: p.weightKg,
+    const doc = { id: id('pat'), uid: P.newUid(), firstName: p.firstName, lastName: p.lastName, dob: p.dob, sex: p.sex, phone: p.phone, phoneVerified: true, email: p.email || null, address: p.address, homeLoc: p.homeLoc, bloodGroup: p.bloodGroup, genotype: p.genotype, weightKg: p.weightKg,
       allergies: (p.allergies || []).map(a => Object.assign({ at: now() }, a)), noKnownAllergies: !!p.noKnownAllergies, conditions: (p.conditions || []).map(c => Object.assign({ at: now() }, c)), status: 'active', createdAt: now(), createdVia: 'demo', userId: null,
       consent: { version: '2026-10', accepted: true, at: now(), channel: 'demo' } };
+    Object.assign(doc, demoNin(p.phone));
     await db.col('patients').insertOne(doc);
     if (p.account) { const u = await mkUser({ name: p.firstName + ' ' + p.lastName, email: p.email, phone: p.phone, patientId: doc.id }); await db.col('patients').updateOne({ id: doc.id }, { $set: { userId: u.id } }); ctx.users[p.key] = u; }
     for (const ok of p.links) await P.ensureLink(ctx.orgs[ok].id, doc.id, 'demo', 'demo');
@@ -105,6 +109,8 @@ async function load() {
   // each service module adds its own demo records
   for (const m of require('../modules')) if (typeof m.seedDemo === 'function') { try { await m.seedDemo(ctx); } catch (e) { console.error('[demo] seed failed in', m.name, e.message); throw e; } }
   await seedGroupAndNetwork(ctx);
+  // modules whose demo data needs the group, the network and every patient in place
+  for (const m of require('../modules')) if (typeof m.seedDemoAfter === 'function') { try { await m.seedDemoAfter(ctx); } catch (e) { console.error('[demo] late seed failed in', m.name, e.message); throw e; } }
   await db.col('meta').findOneAndUpdate({ id: 'demo' }, { $set: { id: 'demo', at: now() } }, { upsert: true });
   return ctx;
 }
@@ -139,8 +145,9 @@ async function seedGroupAndNetwork(ctx) {
   }
   await groups.refreshGroupSubscription(g.id);
   // a patient registered at the Ikeja branch is a patient of the Ajah branch too
-  const doc = { id: id('pat'), firstName: 'Ngozi', lastName: 'Okafor', dob: '1979-06-21', sex: 'female', phone: '+2348061112233', phoneVerified: true, email: 'ngozi@patient.demo', address: '11 Isaac John St, Ikeja GRA', homeLoc: { lat: 6.5810, lng: 3.3560 }, bloodGroup: 'A+', genotype: 'AA', weightKg: 70,
+  const doc = { id: id('pat'), uid: P.newUid(), firstName: 'Ngozi', lastName: 'Okafor', dob: '1979-06-21', sex: 'female', phone: '+2348061112233', phoneVerified: true, email: 'ngozi@patient.demo', address: '11 Isaac John St, Ikeja GRA', homeLoc: { lat: 6.5810, lng: 3.3560 }, bloodGroup: 'A+', genotype: 'AA', weightKg: 70,
     allergies: [], noKnownAllergies: true, conditions: [{ name: 'Asthma', code: 'J45', at: now() }], status: 'active', createdAt: now(), createdVia: 'demo', userId: null, consent: { version: '2026-10', accepted: true, at: now(), channel: 'demo' } };
+  Object.assign(doc, demoNin(doc.phone));
   await db.col('patients').insertOne(doc);
   const nu = await mkUser({ name: 'Ngozi Okafor', email: doc.email, phone: doc.phone, patientId: doc.id }); await db.col('patients').updateOne({ id: doc.id }, { $set: { userId: nu.id } });
   await P.ensureLink(ctx.branches.ikeja.id, doc.id, 'demo', 'demo');
@@ -208,4 +215,4 @@ function accounts() {
   return { password: DEMO_PASSWORD, rows };
 }
 
-module.exports = { load, accounts, DEMO_PASSWORD, ORGS, STAFF, DOMAIN, PATIENTS };
+module.exports = { load, accounts, DEMO_PASSWORD, ORGS, STAFF, DOMAIN, PATIENTS, demoNinOf };

@@ -96,6 +96,28 @@
 
   /* ================= members and cover ================= */
   const MEMBER_TABS = ['pending', 'active', 'suspended', 'ended', 'rejected', 'declined'];
+  /* register a client as an institution, with their NIN: no paperwork, no phone verification */
+  async function registerMember() {
+    const plans = (await api.get('/api/payer/plans')).filter(p => p.active !== false);
+    view(html`<a class="back" href="#/members">${icon('left')}${T('members.title', 'Members and cover')}</a><div class="page-head"><div><h1>${T('mreg.title', 'Register a client')}</h1><p>${T('mreg.sub', 'Register your client with their NIN, as a hospital would. If they are already on MediCore they confirm the cover in their app; if not, MediCore creates their record and the cover starts now. Providers who find them by NIN see your HMO.')}</p></div></div>
+      ${plans.length ? html`<form class="panel" data-form="mreg" novalidate>
+        <div class="fields two"><div class="field"><label for="mr-fn">${T('mreg.first', 'First name')}</label><input class="input" id="mr-fn" name="firstName" maxlength="60" required></div><div class="field"><label for="mr-ln">${T('mreg.last', 'Last name')}</label><input class="input" id="mr-ln" name="lastName" maxlength="60" required></div>
+        <div class="field"><label for="mr-dob">${T('mreg.dob', 'Date of birth')}</label><input class="input" id="mr-dob" name="dob" type="date" max="${MC.todayISO()}"></div><div class="field"><label for="mr-sex">${T('mreg.sex', 'Sex')}</label><select class="input" id="mr-sex" name="sex"><option value="unknown">-</option><option value="female">${T('mreg.female', 'Female')}</option><option value="male">${T('mreg.male', 'Male')}</option></select></div>
+        <div class="field"><label for="mr-nin">${T('mreg.nin', 'NIN (11 digits)')}</label><input class="input" id="mr-nin" name="nin" inputmode="numeric" maxlength="11" autocomplete="off"></div><div class="field"><label for="mr-nonin">${T('mreg.no_nin', 'No NIN? Say why')}</label><select class="input" id="mr-nonin" name="noNinReason"><option value="">${T('mreg.has_nin', 'The client has a NIN')}</option><option value="child">${T('mreg.nonin_child', 'A child without a NIN yet')}</option><option value="not_enrolled">${T('mreg.nonin_ne', 'Not yet enrolled with NIMC')}</option><option value="foreign_national">${T('mreg.nonin_f', 'Foreign national')}</option></select></div>
+        <div class="field"><label for="mr-ph">${T('mreg.phone', 'Phone')}</label><input class="input" id="mr-ph" name="phone" inputmode="tel" autocomplete="off"></div><div class="field"><label for="mr-em">${T('mreg.email', 'Email')}</label><input class="input" id="mr-em" name="email" type="email" autocomplete="off"></div>
+        <div class="field"><label for="mr-plan">${T('mreg.plan', 'Plan')}</label><select class="input" id="mr-plan" name="planId">${plans.map(p => html`<option value="${p.id}">${p.name}</option>`)}</select></div><div class="field"><label for="mr-to">${T('mreg.valid_to', 'Cover valid to')}</label><input class="input" id="mr-to" name="validTo" type="date" min="${MC.todayISO()}"><div class="hint">${T('mreg.valid_to_h', 'Leave empty for one year from today.')}</div></div></div>
+        <label class="check"><input type="checkbox" name="consent"><span>${T('mreg.consent', 'The client signed our enrolment form and agrees to MediCore\'s privacy notice.')}</span></label>
+        <div class="form-err notice bad" hidden></div><div class="btn-row"><button class="btn primary" type="submit">${T('mreg.submit', 'Register client')}</button></div></form>` : empty({ icon: 'file', title: T('mreg.no_plans', 'Create a plan first'), action: html`<a class="btn primary" href="#/plans">${T('nav.plans', 'Plans')}</a>` })}`);
+  }
+  form('mreg', async d => {
+    const nin = String(d.nin || '').replace(/\s+/g, '');
+    if (!d.firstName || !d.lastName) throw new MC.ApiError(400, { error: T('mreg.need_name', 'Type the first and last name') });
+    if (!nin && !d.noNinReason) throw new MC.ApiError(400, { error: T('mreg.need_nin', 'Type the NIN, or choose why the client has none') });
+    if (!d.consent) throw new MC.ApiError(400, { error: T('mreg.need_consent', 'Tick the box once the client has agreed') });
+    const r = await api.post('/api/payer/members/register', { firstName: d.firstName, lastName: d.lastName, dob: d.dob || undefined, sex: d.sex, phone: d.phone || undefined, email: d.email || undefined, nin: nin || undefined, noNinReason: nin ? undefined : d.noNinReason, planId: d.planId, validTo: d.validTo || undefined, consent: true });
+    toast(r.status === 'active' ? T('mreg.done_new', 'Registered: member {n}, cover active', { n: r.memberNo }) : T('mreg.done_existing', 'Member {n} created. The client confirms it in the app.', { n: r.memberNo }), 'ok');
+    MC.go('#/members/' + r.coverageId);
+  });
   async function members({ query, stale }) {
     const status = MEMBER_TABS.includes(query.status) ? query.status : (query.status === 'all' ? '' : 'pending');
     const rows = await api.get('/api/payer/coverages' + qs({ status, q: query.q, limit: 300 }));
@@ -107,7 +129,7 @@
       ${list.map(c => html`<tr><td data-label="${T('col.member', 'Member')}"><b>${c.member.name || T('member.unnamed', 'Name not given')}</b></td><td data-label="${T('col.memberno', 'Member number')}">${c.memberNo}</td><td data-label="${T('col.phone', 'Phone')}">${c.member.phone || '-'}</td><td data-label="${T('col.plan', 'Plan')}">${c.planName || '-'}</td><td data-label="${T('col.valid', 'Valid to')}">${c.validTo ? isoDate(c.validTo) : '-'}</td><td data-label="${T('col.status', 'Status')}">${sBadge(c.status)}</td>
         <td class="num"><a class="btn sm ${c.status === 'pending' && c.patientConfirmed && !c.payerVerified ? 'primary' : ''}" href="#/members/${c.id}">${c.status === 'pending' && c.patientConfirmed && !c.payerVerified ? T('members.verify', 'Verify') : T('members.open', 'Open')}</a></td></tr>`)}</tbody></table></div>`;
     view(html`<div class="page-head"><div><h1>${T('members.title', 'Members and cover')}</h1><p>${T('members.sub', 'Verify cover members add in the MediCore app, and manage plans and limits.')}</p></div>
-      ${can('payer.members') ? html`<div class="actions"><a class="btn primary" href="#/members/enrol">${icon('plus')}${T('members.enrol', 'Enrol members')}</a></div>` : ''}</div>
+      ${can('payer.members') ? html`<div class="actions"><a class="btn primary" href="#/members/register">${icon('user')}${T('members.register', 'Register a client')}</a><a class="btn" href="#/members/enrol">${icon('plus')}${T('members.enrol', 'Enrol members')}</a></div>` : ''}</div>
       <nav class="tabs" aria-label="${T('members.filter', 'Filter by status')}">${MEMBER_TABS.concat(['all']).map(s => html`<a href="#/members?status=${s}" aria-current="${(s === 'all' ? !status : status === s) ? 'page' : 'false'}">${s === 'all' ? T('members.all', 'All') : st(s)}</a>`)}</nav>
       <form data-form="member-search" class="row wrap" style="margin-bottom:16px" role="search"><div class="search" style="flex:1;min-width:200px"><label class="sr-only" for="ms-q">${T('members.search', 'Search members')}</label>${icon('search')}<input class="input" id="ms-q" name="q" value="${query.q || ''}" placeholder="${T('members.search_ph', 'Member number, name or phone')}"><input type="hidden" name="status" value="${query.status || ''}"></div><button class="btn" type="submit">${T('members.search_btn', 'Search')}</button></form>
       ${!rows.length ? empty({ icon: 'users', title: status === 'pending' ? T('members.none_pending', 'No cover waiting for you') : T('members.none', 'No members found'), body: status === 'pending' ? T('members.none_pending_sub', 'When a member adds your HMO in the MediCore app, it appears here to verify.') : T('members.none_sub', 'Try another status or search.') }) : ''}
@@ -152,9 +174,11 @@
             <dt>${T('member.confirmed', 'Member confirmed')}</dt><dd>${c.patientConfirmed ? T('yes', 'Yes') : T('no', 'No')}</dd>
             <dt>${T('member.verified', 'HMO verified')}</dt><dd>${c.payerVerified ? T('yes', 'Yes') : T('no', 'No')}</dd>
           </dl></section>
+          <div id="mem-extra"></div>
           <section class="panel"><h2>${T('history', 'History')}</h2>${timeline(c.history)}</section>
         </div>
       </div>`);
+    memberExtras(c).catch(() => {});
 
     const reasonDlg = (title, body, ok, path, danger) => dialog({ title, form: true, body: html`<p>${body}</p><div class="field"><label for="cv-r">${T('reason', 'Reason')}</label><textarea class="input" id="cv-r" name="reason" required minlength="3" maxlength="300"></textarea></div>`,
       actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: ok, primary: true, danger }], onSubmit: d => api.post('/api/payer/coverages/' + c.id + '/' + path, { reason: d.reason }) });
@@ -410,6 +434,130 @@
     });
   }
 
+
+  /* ================= plans, network, employers, capitation, member requests ================= */
+  const KIND_EN = { individual: 'Individual', family: 'Family', corporate: 'Corporate' };
+  const kindLabel = k => T('plan.kind.' + k, KIND_EN[k] || cap(k));
+  const LEVEL_EN = { primary: 'Primary care', secondary: 'Secondary (referral) care', tertiary: 'Tertiary care', specialist: 'Specialist', diagnostic: 'Lab and diagnostics', pharmacy: 'Pharmacy' };
+  const levelLabel = l => T('net.level.' + l, LEVEL_EN[l] || cap(l));
+  const monthNow = () => new Date(Date.now() + 3600e3).toISOString().slice(0, 7);
+  async function plansPage({ stale }) {
+    const rows = await api.get('/api/payer/plans'); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${T('plans.title', 'Plans')}</h1><p>${T('plans.sub', 'Your benefit packages. Plans marked for online sale appear in the patient app, where people buy and pay for them.')}</p></div>${can('payer.plans') ? html`<div class="actions"><button class="btn primary" data-action="plan-new">${icon('plus')}${T('plans.new', 'New plan')}</button></div>` : ''}</div>
+      <section class="panel flush">${rows.length ? html`<ul class="list">${rows.map(p => html`<li><div class="grow"><span class="title">${p.name} ${p.sellOnline ? badge(T('plans.online', 'Sold in the app'), 'ok') : ''} ${p.active ? '' : badge(T('plans.inactive', 'Not offered'), 'warn')}</span>
+        <span class="sub">${kindLabel(p.kind)} | ${[p.premiumMonthlyKobo ? money(p.premiumMonthlyKobo) + ' ' + T('plans.a_month', 'a month') : null, p.premiumAnnualKobo ? money(p.premiumAnnualKobo) + ' ' + T('plans.a_year', 'a year') : null].filter(Boolean).join(', ') || T('plans.no_price', 'No premium set')} | ${T('plans.total_limit', 'Limits {a}', { a: money(sum(p.limits)) })} | ${T('plans.members', '{n} members', { n: p.members })}</span></div>
+        ${can('payer.plans') ? html`<span class="end"><button class="btn sm" data-action="plan-edit" data-id="${p.id}">${T('plans.edit', 'Edit')}</button></span>` : ''}</li>`)}</ul>` : empty({ icon: 'shield', title: T('plans.none', 'No plans yet'), body: T('plans.none_sub', 'Create your plans so you can enrol members against them and sell them in the app.') })}</section>`);
+    const dlg = p => dialog({ title: p ? p.name : T('plans.new', 'New plan'), wide: true, form: true, body: html`
+      <div class="fields three"><div class="field"><label for="pl-n">${T('plans.name', 'Name')}</label><input class="input" id="pl-n" name="name" required maxlength="80" value="${p ? p.name : ''}"></div><div class="field"><label for="pl-k">${T('plans.kind', 'Kind')}</label><select class="input" id="pl-k" name="kind">${Object.keys(KIND_EN).map(k => html`<option value="${k}" ${p && p.kind === k ? 'selected' : ''}>${kindLabel(k)}</option>`)}</select></div><div class="field"><label for="pl-d">${T('plans.deps', 'Family members allowed')}</label><input class="input" id="pl-d" name="maxDependants" type="number" min="0" max="12" value="${p ? p.maxDependants : 0}"></div></div>
+      <div class="fields three"><div class="field"><label for="pl-m">${T('plans.monthly', 'Monthly premium (NGN)')}</label><input class="input" id="pl-m" name="premiumMonthlyKobo" type="number" min="0" data-kobo value="${p && p.premiumMonthlyKobo ? p.premiumMonthlyKobo / 100 : ''}"></div><div class="field"><label for="pl-y">${T('plans.yearly', 'Yearly premium (NGN)')}</label><input class="input" id="pl-y" name="premiumAnnualKobo" type="number" min="0" data-kobo value="${p && p.premiumAnnualKobo ? p.premiumAnnualKobo / 100 : ''}"></div><div class="field"><label for="pl-w">${T('plans.waiting', 'Waiting period (days)')}</label><input class="input" id="pl-w" name="waitingDays" type="number" min="0" max="365" value="${p ? p.waitingDays : 0}"></div></div>
+      <p class="muted sm">${T('member.limits_hint', 'Yearly limit per category in naira. Leave 0 for categories the plan does not cover.')}</p>${limitFields('pl', p ? p.limits : null)}
+      <div class="field"><label for="pl-b">${T('plans.benefits', 'What it covers (plain words)')}</label><textarea class="input" id="pl-b" name="benefits" rows="3" maxlength="3000">${p ? p.benefits : ''}</textarea></div>
+      <div class="field"><label for="pl-e">${T('plans.exclusions', 'What it does not cover')}</label><textarea class="input" id="pl-e" name="exclusions" rows="2" maxlength="3000">${p ? p.exclusions : ''}</textarea></div>
+      <label class="check"><input type="checkbox" name="sellOnline" ${p && p.sellOnline ? 'checked' : ''}><span><b>${T('plans.sell', 'Sell this plan in the patient app')}</b></span></label>
+      <label class="check"><input type="checkbox" name="activateOnPayment" ${!p || p.activateOnPayment ? 'checked' : ''}><span>${T('plans.auto', 'Activate cover as soon as the premium is paid (untick to check each buyer first)')}</span></label>
+      ${p ? html`<label class="check"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}><span>${T('plans.offered', 'Offered')}</span></label>` : ''}`,
+      actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('plans.save', 'Save plan'), primary: true }],
+      onSubmit: d => { const b = { name: d.name, kind: d.kind, maxDependants: Number(d.maxDependants || 0), premiumMonthlyKobo: d.premiumMonthlyKobo, premiumAnnualKobo: d.premiumAnnualKobo, waitingDays: Number(d.waitingDays || 0), limits: readLimits(d), benefits: d.benefits || '', exclusions: d.exclusions || '', sellOnline: !!d.sellOnline, activateOnPayment: !!d.activateOnPayment }; if (p) b.active = !!d.active; return p ? api.patch('/api/payer/plans/' + p.id, b) : api.post('/api/payer/plans', b); } });
+    on('plan-new', async () => { if (await dlg(null)) MC.render(); });
+    on('plan-edit', async el => { if (await dlg(rows.find(x => x.id === el.dataset.id))) MC.render(); });
+  }
+  async function networkPage({ query, stale }) {
+    const rows = await api.get('/api/payer/network' + qs({ status: query.status })); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${T('net.title', 'Provider network')}</h1><p>${T('net.sub', 'Hospitals, clinics, pharmacies and labs on MediCore that treat your members. Members see your network free in the app.')}</p></div>${can('payer.network') ? html`<div class="actions"><a class="btn primary" href="#/network/add">${icon('plus')}${T('net.add', 'Invite providers')}</a></div>` : ''}</div>
+      <div class="map" id="net-map" style="height:280px;border-radius:var(--r);overflow:hidden;margin-bottom:12px"></div>
+      <section class="panel flush">${rows.length ? html`<ul class="list">${rows.map(n => html`<li><div class="grow"><span class="title">${n.orgName} ${sBadge(n.status === 'invited' ? 'pending' : n.status)}</span><span class="sub">${[cap(n.orgType), n.area, levelLabel(n.level), n.primaryCare ? T('net.cap', 'Capitation {a} a month, {n} enrollees', { a: money(n.capitationKobo), n: n.enrollees }) : null].filter(Boolean).join(' | ')}</span></div>
+        ${can('payer.network') ? html`<span class="end"><button class="btn sm" data-action="net-edit" data-id="${n.id}">${T('plans.edit', 'Edit')}</button>${n.status === 'active' ? html`<button class="btn sm" data-action="net-act" data-a="suspend" data-id="${n.id}">${T('member.suspend', 'Suspend')}</button>` : n.status === 'suspended' ? html`<button class="btn sm" data-action="net-act" data-a="reactivate" data-id="${n.id}">${T('member.reactivate', 'Reactivate')}</button>` : ''}${['invited', 'active', 'suspended'].includes(n.status) ? html`<button class="btn sm danger" data-action="net-act" data-a="end" data-id="${n.id}">${T('net.end', 'Remove')}</button>` : ''}</span>` : ''}</li>`)}</ul>` : empty({ icon: 'building', title: T('net.none', 'No providers in your network yet'), body: T('net.none_sub', 'Invite the providers you have agreements with. They accept in their admin app.') })}</section>`);
+    try { const m = await MC.map(document.getElementById('net-map'), {}); rows.filter(n => n.location).forEach(n => m.setMarker(n.id, n.location, { kind: 'hospital', label: n.orgName, color: n.status === 'active' ? '#1E7A4C' : '#9A5B00' })); m.fit(); } catch (e) { /* list is enough */ }
+    on('net-edit', async el => {
+      const n = rows.find(x => x.id === el.dataset.id);
+      const v = await dialog({ title: n.orgName, form: true, body: netFields(n), actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('net.save', 'Save'), primary: true }], onSubmit: d => api.patch('/api/payer/network/' + n.id, { level: d.level, primaryCare: !!d.primaryCare, capitationKobo: d.capitationKobo || 0, note: d.note || '' }) });
+      if (v) MC.render();
+    });
+    on('net-act', async el => {
+      let reason;
+      if (el.dataset.a !== 'reactivate') { const v = await dialog({ title: cap(el.dataset.a), form: true, body: html`<div class="field"><label for="na-r">${T('reason', 'Reason')}</label><input class="input" id="na-r" name="reason" required maxlength="300"></div>`, actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: MC.t('kit.confirm', 'Confirm'), primary: true }] }); if (!v) return; reason = v.reason; }
+      await api.post('/api/payer/network/' + el.dataset.id + '/' + el.dataset.a, { reason }); MC.render();
+    });
+  }
+  const netFields = n => html`<div class="field"><label for="nf-l">${T('net.level', 'Level')}</label><select class="input" id="nf-l" name="level">${Object.keys(LEVEL_EN).map(l => html`<option value="${l}" ${n && n.level === l ? 'selected' : ''}>${levelLabel(l)}</option>`)}</select></div>
+    <label class="check"><input type="checkbox" name="primaryCare" ${!n || n.primaryCare ? 'checked' : ''}><span>${T('net.primary', 'Members can choose them as their primary provider')}</span></label>
+    <div class="field"><label for="nf-c">${T('net.capitation', 'Capitation per enrollee per month (NGN)')}</label><input class="input" id="nf-c" name="capitationKobo" type="number" min="0" data-kobo value="${n && n.capitationKobo ? n.capitationKobo / 100 : ''}"></div>
+    <div class="field"><label for="nf-n">${T('net.note', 'Note')}</label><input class="input" id="nf-n" name="note" maxlength="300" value="${n && n.note ? n.note : ''}"></div>`;
+  async function networkAdd({ query, stale }) {
+    const rows = await api.get('/api/payer/network/candidates' + qs({ q: query.q, type: query.type })); if (stale()) return;
+    view(html`<a class="back" href="#/network">${icon('left')}${T('net.title', 'Provider network')}</a><div class="page-head"><div><h1>${T('net.add', 'Invite providers')}</h1><p>${T('net.add_sub', 'Providers on MediCore. They see your invitation in their admin app and join with one tap.')}</p></div></div>
+      <form class="row" data-form="net-q" novalidate style="margin-bottom:12px"><input class="input" name="q" value="${query.q || ''}" placeholder="${T('net.search', 'Name or area')}" aria-label="${T('net.search', 'Name or area')}" style="flex:1"><select class="input" name="type" aria-label="${T('net.type', 'Type')}" style="max-width:180px"><option value="">${T('net.any', 'Any type')}</option>${['hospital', 'clinic', 'pharmacy', 'lab', 'ambulance'].map(x => html`<option value="${x}" ${query.type === x ? 'selected' : ''}>${cap(x)}</option>`)}</select><button class="btn" type="submit">${icon('search')}</button></form>
+      <section class="panel flush"><ul class="list">${rows.map(o => html`<li><div class="grow"><span class="title">${o.name}</span><span class="sub">${[cap(o.type), o.area, o.city].filter(Boolean).join(' | ')}</span></div><span class="end">${o.networkStatus ? sBadge(o.networkStatus === 'invited' ? 'pending' : o.networkStatus) : html`<button class="btn sm primary" data-action="net-invite" data-id="${o.id}" data-name="${o.name}" data-type="${o.type}">${T('net.invite', 'Invite')}</button>`}</span></li>`)}</ul></section>`);
+  }
+  form('net-q', d => MC.go('#/network/add' + qs({ q: d.q, type: d.type })));
+  on('net-invite', async el => {
+    const v = await dialog({ title: T('net.invite_title', 'Invite {name}', { name: el.dataset.name }), form: true, body: netFields({ level: el.dataset.type === 'pharmacy' ? 'pharmacy' : el.dataset.type === 'lab' ? 'diagnostic' : 'primary', primaryCare: ['hospital', 'clinic'].includes(el.dataset.type) }),
+      actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('net.invite', 'Invite'), primary: true }], onSubmit: d => api.post('/api/payer/network', { orgId: el.dataset.id, level: d.level, primaryCare: !!d.primaryCare, capitationKobo: d.capitationKobo || 0, note: d.note || '' }) });
+    if (v) { toast(T('net.invited', 'Invitation sent'), 'ok'); MC.render(); }
+  });
+  async function capitationPage({ query, stale }) {
+    const month = query.month || monthNow();
+    const d = await api.get('/api/payer/capitation' + qs({ month })); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${T('cap.title', 'Capitation')}</h1><p>${T('cap.sub', 'Monthly payment to each primary care provider for the members who chose them')}</p></div></div>
+      <form class="row" data-form="cap-m" novalidate style="margin-bottom:12px"><input class="input" type="month" name="month" value="${month}" aria-label="${T('cap.month', 'Month')}" style="max-width:200px"><button class="btn" type="submit">${T('cap.show', 'Show')}</button></form>
+      ${figures([{ value: money(d.totalKobo), label: T('cap.total', 'Total for {m}', { m: month }) }, { value: money(d.paidKobo), label: T('cap.paid', 'Paid') }, { value: money(d.totalKobo - d.paidKobo), label: T('cap.due', 'Still to pay'), tone: d.totalKobo - d.paidKobo ? 'warn' : '' }])}
+      <section class="panel flush">${d.rows.length ? html`<div class="table-wrap" style="border:0"><table class="t stack-sm"><thead><tr><th>${T('col.provider', 'Provider')}</th><th class="num">${T('cap.enrollees', 'Enrollees')}</th><th class="num">${T('cap.rate', 'Rate')}</th><th class="num">${T('cap.amount', 'Amount')}</th><th></th></tr></thead><tbody>
+        ${d.rows.map(r => html`<tr><td data-label="${T('col.provider', 'Provider')}"><b>${r.orgName}</b></td><td class="num" data-label="${T('cap.enrollees', 'Enrollees')}">${r.enrollees}</td><td class="num" data-label="${T('cap.rate', 'Rate')}">${money(r.rateKobo)}</td><td class="num" data-label="${T('cap.amount', 'Amount')}">${money(r.amountKobo)}</td><td class="num">${r.paid ? html`${sBadge('paid')}<br><span class="xs muted">${r.reference}</span>` : can('payer.pay') ? html`<button class="btn sm primary" data-action="cap-pay" data-org="${r.orgId}" data-name="${r.orgName}" data-amount="${r.amountKobo}" data-month="${month}">${T('cap.record', 'Record payment')}</button>` : ''}</td></tr>`)}</tbody></table></div>` : empty({ icon: 'card', title: T('cap.none', 'No primary care providers in your network') })}</section>`);
+  }
+  form('cap-m', d => MC.go('#/capitation' + qs({ month: d.month })));
+  on('cap-pay', async el => {
+    const v = await dialog({ title: T('cap.pay_title', 'Capitation to {name}', { name: el.dataset.name }), form: true, body: html`<p>${T('cap.pay_body', 'Record that you paid {a} for {m}. Each provider is paid once a month.', { a: money(Number(el.dataset.amount)), m: el.dataset.month })}</p><div class="field"><label for="cp-r">${T('cap.reference', 'Bank transfer reference')}</label><input class="input" id="cp-r" name="reference" required maxlength="60"></div>`,
+      actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('cap.record', 'Record payment'), primary: true }], onSubmit: d => api.post('/api/payer/capitation/pay', { month: el.dataset.month, orgId: el.dataset.org, reference: d.reference }) });
+    if (v) { toast(T('cap.recorded', 'Payment recorded'), 'ok'); MC.render(); }
+  });
+  async function employersPage({ stale }) {
+    const [rows, plans] = await Promise.all([api.get('/api/payer/employers'), api.get('/api/payer/plans')]); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${T('emp.title', 'Employers')}</h1><p>${T('emp.sub', 'Companies whose staff you cover')}</p></div>${can('payer.members') ? html`<div class="actions"><button class="btn primary" data-action="emp-new">${icon('plus')}${T('emp.new', 'New employer')}</button></div>` : ''}</div>
+      <section class="panel flush">${rows.length ? html`<ul class="list">${rows.map(e => html`<li><div class="grow"><span class="title">${e.name}</span><span class="sub">${[e.contactName, e.phone, e.email, (plans.find(p => p.id === e.planId) || {}).name, T('plans.members', '{n} members', { n: e.members })].filter(Boolean).join(' | ')}</span></div></li>`)}</ul>` : empty({ icon: 'building', title: T('emp.none', 'No employers yet') })}</section>`);
+    on('emp-new', async () => {
+      const v = await dialog({ title: T('emp.new', 'New employer'), form: true, body: html`<div class="field"><label for="em-n">${T('emp.name', 'Company name')}</label><input class="input" id="em-n" name="name" required maxlength="120"></div><div class="fields two"><div class="field"><label for="em-c">${T('emp.contact', 'Contact person')}</label><input class="input" id="em-c" name="contactName" maxlength="100"></div><div class="field"><label for="em-p">${T('emp.phone', 'Phone')}</label><input class="input" id="em-p" name="phone" inputmode="tel"></div></div><div class="fields two"><div class="field"><label for="em-e">${T('emp.email', 'Email')}</label><input class="input" id="em-e" name="email" type="email"></div><div class="field"><label for="em-pl">${T('emp.plan', 'Usual plan')}</label><select class="input" id="em-pl" name="planId"><option value="">-</option>${plans.map(p => html`<option value="${p.id}">${p.name}</option>`)}</select></div></div>`,
+        actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('emp.save', 'Save'), primary: true }], onSubmit: d => api.post('/api/payer/employers', d) });
+      if (v) MC.render();
+    });
+  }
+  async function requestsPage({ query, stale }) {
+    const status = query.status || 'open';
+    const rows = await api.get('/api/payer/requests' + qs({ status })); if (stale()) return;
+    MC.navCount('#/requests', status === 'open' ? rows.length : undefined);
+    view(html`<div class="page-head"><div><h1>${T('req.title', 'Member requests')}</h1><p>${T('req.sub', 'Questions, changes and complaints from members in the app')}</p></div></div>
+      <div class="tabs" role="tablist">${['open', 'answered', 'closed'].map(s => html`<a role="tab" href="#/requests?status=${s}" aria-selected="${s === status}">${st(s)}</a>`)}</div>
+      ${rows.length ? rows.map(r => html`<section class="panel"><div class="row between"><h2 style="margin:0">${r.subject}</h2>${r.unread ? badge(T('req.new', 'New'), 'warn') : ''}</div><p class="muted sm">${r.number} | ${r.memberName || ''} | ${r.memberNo} | ${T('req.type.' + r.type, cap(r.type))}</p>
+        ${r.messages.map(m => html`<div class="notice ${m.by === 'hmo' ? 'ok' : ''}" style="margin:6px 0"><span class="xs muted">${m.byName} | ${dateTime(m.at)}</span><br>${m.text}</div>`)}
+        <form data-form="req-reply" data-id="${r.id}" novalidate><div class="field"><label for="rr-${r.id}">${T('req.reply', 'Reply')}</label><textarea class="input" id="rr-${r.id}" name="text" required rows="2" maxlength="2000"></textarea></div><label class="check"><input type="checkbox" name="close"><span>${T('req.close', 'Close the request with this reply')}</span></label><div class="btn-row"><button class="btn primary" type="submit">${T('req.send', 'Send reply')}</button><a class="btn" href="#/members/${r.coverageId}">${T('req.member', 'Open member')}</a></div></form></section>`)
+        : empty({ icon: 'message', title: T('req.none', 'No requests here') })}`);
+    rows.filter(r => r.unread).forEach(r => api.post('/api/payer/requests/' + r.id + '/read').catch(() => {}));
+  }
+  form('req-reply', async (d, f) => { await api.post('/api/payer/requests/' + f.dataset.id + '/reply', { text: d.text, close: !!d.close }); toast(T('req.sent', 'Reply sent'), 'ok'); MC.render(); });
+  /* member page additions: plan, primary provider, employer, family */
+  async function memberExtras(c) {
+    const box = document.getElementById('mem-extra'); if (!box) return;
+    const [fam, plans, emps, nets] = await Promise.all([api.get('/api/payer/coverages/' + c.id + '/family').catch(() => []), api.get('/api/payer/plans').catch(() => []), api.get('/api/payer/employers').catch(() => []), api.get('/api/payer/network?status=active').catch(() => [])]);
+    const me1 = fam.find(x => x.id === c.id) || {};
+    MC.view(html`<section class="panel"><h2>${T('mx.title', 'Plan, primary provider and card')}</h2><dl class="kv"><dt>${T('col.plan', 'Plan')}</dt><dd>${me1.planName || '-'}</dd><dt>${T('mx.primary', 'Primary provider')}</dt><dd>${me1.primaryOrgName || '-'}</dd><dt>${T('mx.employer', 'Employer')}</dt><dd>${me1.employerName || '-'}</dd><dt>${T('mx.card', 'Card code')}</dt><dd>${me1.cardCode ? html`<b>${me1.cardCode}</b>` : '-'}</dd><dt>${T('mx.relation', 'Relation')}</dt><dd>${cap(me1.relation || 'self')}</dd></dl>
+      ${can('payer.members') ? html`<button class="btn" data-action="mx-edit">${icon('edit')}${T('mx.edit', 'Change plan, provider or employer')}</button>` : ''}</section>
+      <section class="panel flush"><h2>${T('mx.family', 'Family on this cover')}</h2>${fam.length > 1 ? html`<ul class="list">${fam.map(x => html`<a href="#/members/${x.id}"><div class="grow"><span class="title">${x.name || x.memberNo}</span><span class="sub">${x.memberNo} | ${cap(x.relation || 'self')}${x.dob ? ' | ' + x.dob : ''}</span></div>${sBadge(x.status)}</a>`)}</ul>` : html`<p class="muted sm" style="padding:0 16px">${T('mx.no_family', 'No family members on this cover.')}</p>`}
+        ${can('payer.members') && !c.principalCoverageId ? html`<div style="padding:12px 16px"><button class="btn" data-action="mx-dep">${icon('plus')}${T('mx.add_dep', 'Add a family member')}</button></div>` : ''}</section>`, box);
+    on('mx-edit', async () => {
+      const v = await dialog({ title: T('mx.edit', 'Change plan, provider or employer'), form: true, body: html`<div class="field"><label for="mx-p">${T('col.plan', 'Plan')}</label><select class="input" id="mx-p" name="planId"><option value="">-</option>${plans.map(p => html`<option value="${p.id}" ${me1.planId === p.id ? 'selected' : ''}>${p.name}</option>`)}</select></div>
+        <div class="field"><label for="mx-o">${T('mx.primary', 'Primary provider')}</label><select class="input" id="mx-o" name="primaryOrgId"><option value="">-</option>${nets.filter(n => n.primaryCare).map(n => html`<option value="${n.orgId}" ${me1.primaryOrgId === n.orgId ? 'selected' : ''}>${n.orgName}</option>`)}</select></div>
+        <div class="field"><label for="mx-e">${T('mx.employer', 'Employer')}</label><select class="input" id="mx-e" name="employerId"><option value="">-</option>${emps.map(e => html`<option value="${e.id}">${e.name}</option>`)}</select></div>`,
+        actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('net.save', 'Save'), primary: true }], onSubmit: d => api.post('/api/payer/coverages/' + c.id + '/details', { planId: d.planId, primaryOrgId: d.primaryOrgId, employerId: d.employerId }) });
+      if (v) MC.render();
+    });
+    on('mx-dep', async () => {
+      const v = await dialog({ title: T('mx.add_dep', 'Add a family member'), form: true, body: html`<div class="fields two"><div class="field"><label for="dp-f">${T('mx.first', 'First name')}</label><input class="input" id="dp-f" name="firstName" required maxlength="60"></div><div class="field"><label for="dp-l">${T('mx.last', 'Last name')}</label><input class="input" id="dp-l" name="lastName" required maxlength="60"></div></div>
+        <div class="fields three"><div class="field"><label for="dp-d">${T('mx.dob', 'Date of birth')}</label><input class="input" id="dp-d" name="dob" type="date"></div><div class="field"><label for="dp-s">${T('mx.sex', 'Sex')}</label><select class="input" id="dp-s" name="sex"><option value="female">${T('mx.female', 'Female')}</option><option value="male">${T('mx.male', 'Male')}</option></select></div><div class="field"><label for="dp-r">${T('mx.relation', 'Relation')}</label><select class="input" id="dp-r" name="relation"><option value="child">${T('mx.child', 'Child')}</option><option value="spouse">${T('mx.spouse', 'Husband or wife')}</option><option value="parent">${T('mx.parent', 'Parent')}</option><option value="other">${T('mx.other', 'Other')}</option></select></div></div>
+        <div class="field"><label for="dp-p">${T('mx.phone', 'Phone (optional, not needed for children)')}</label><input class="input" id="dp-p" name="phone" inputmode="tel"></div>`,
+        actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('mx.add', 'Add'), primary: true }], onSubmit: d => api.post('/api/payer/coverages/' + c.id + '/dependants', d) });
+      if (v) { toast(T('mx.added', 'Added with member number {n}', { n: v.memberNo }), 'ok'); MC.render(); }
+    });
+  }
+
   MC.boot({
     title: 'MediCore HMO', home: '#/',
     nav: [
@@ -417,8 +565,15 @@
       { href: '#/members', label: T('nav.members', 'Members and cover'), short: T('nav.members_s', 'Members'), icon: 'users', anyPerm: ['payer.members', 'payer.preauth', 'payer.claims'] },
       { href: '#/preauths', label: T('nav.preauths', 'Pre-authorisations'), short: T('nav.preauths_s', 'Approvals'), icon: 'shield', anyPerm: ['payer.preauth', 'payer.claims'] },
       { href: '#/claims', label: T('nav.claims', 'Claims'), icon: 'file', anyPerm: ['payer.claims', 'payer.pay'] },
-      { href: '#/settings', label: T('nav.settings', 'HMO settings'), short: T('nav.settings_s', 'Settings'), icon: 'settings', anyPerm: ['payer.members', 'payer.preauth', 'payer.claims', 'admin.settings'] },
+      { href: '#/requests', label: T('nav.requests', 'Member requests'), short: T('nav.requests_s', 'Requests'), icon: 'message', anyPerm: ['payer.care', 'payer.members'] },
+      { href: '#/plans', label: T('nav.plans', 'Plans'), icon: 'shield', anyPerm: ['payer.plans', 'payer.members'], sideOnly: true },
+      { href: '#/network', label: T('nav.network', 'Provider network'), short: T('nav.network_s', 'Network'), icon: 'building', anyPerm: ['payer.network', 'payer.members'], show: () => MC.feature('hmoNetwork'), sideOnly: true },
+      { href: '#/capitation', label: T('nav.capitation', 'Capitation'), icon: 'card', anyPerm: ['payer.network', 'payer.pay', 'admin.reports'], show: () => MC.feature('hmoNetwork'), sideOnly: true },
+      { href: '#/employers', label: T('nav.employers', 'Employers'), icon: 'users', anyPerm: ['payer.members'], sideOnly: true },
+      { href: '#/settings', label: T('nav.settings', 'HMO settings'), short: T('nav.settings_s', 'Settings'), icon: 'settings', anyPerm: ['payer.members', 'payer.preauth', 'payer.claims', 'admin.settings'], sideOnly: true },
     ],
-    routes: { '#/': dashboard, '#/members': members, '#/members/enrol': enrolPage, '#/members/:id': memberPage, '#/preauths': preauths, '#/preauths/:id': preauthPage, '#/claims': claims, '#/claims/:id': claimPage, '#/settings': settings },
+    routes: { '#/': dashboard, '#/members': members, '#/members/enrol': enrolPage, '#/members/register': registerMember, '#/members/:id': memberPage, '#/preauths': preauths, '#/preauths/:id': preauthPage, '#/claims': claims, '#/claims/:id': claimPage, '#/settings': settings,
+      '#/plans': plansPage, '#/network': networkPage, '#/network/add': networkAdd, '#/capitation': capitationPage, '#/employers': employersPage, '#/requests': requestsPage },
+    onReady: async () => { try { const o = await api.get('/api/payer/overview'); setTimeout(() => MC.navCount('#/requests', o.openRequests), 0); } catch (e) { /* counts are optional */ } },
   });
 })();

@@ -72,7 +72,13 @@ test('prescriptions go to own or partner pharmacies only', async () => {
 });
 
 test('apply to join a provider; the front desk approves; then the provider appears', async () => {
-  const kunle = await h.as('patient', 'kunle@patient.demo');
+  // a self-registered patient with a NIN: the first provider is free
+  const pc = h.client('patient');
+  const st = await pc.post('/api/patients/register/start', { phone: '08064445566' });
+  assert.equal((await pc.post('/api/patients/register', { phone: '08064445566', code: st.body.devCode, firstName: 'Kunle', lastName: 'Martins', password: 'Strong2026pw', consent: true })).status, 400, 'NIN required');
+  const okReg = await pc.post('/api/patients/register', { phone: '08064445566', code: st.body.devCode, firstName: 'Kunle', lastName: 'Martins', password: 'Strong2026pw', consent: true, nin: '24445556667' });
+  assert.equal(okReg.status, 200);
+  const kunle = pc;
   const list = await kunle.get('/api/join/providers?q=Crestview');
   assert.equal(list.body.length, 1); assert.equal(list.body[0].kind, 'group'); assert.equal(list.body[0].branches.length, 2);
   const ikeja = list.body[0].branches.find(b => b.branchName === 'Ikeja');

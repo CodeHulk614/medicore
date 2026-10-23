@@ -26,7 +26,7 @@ function createApp({ serveStatic = false } = {}) {
 
   // health is answered before anything that can fail
   app.get('/api/health', async (req, res) => {
-    const out = { ok: !config.configProblem, version: '2.0.0', db: null, demoMode: config.DEMO_MODE,
+    const out = { ok: !config.configProblem, version: '2.4.0', db: null, demoMode: config.DEMO_MODE,
       integrations: { payments: (() => { const g = require('./lib/payments').active(); return g.configured ? g.name : (config.DEMO_MODE ? 'demo' : 'off'); })(), sms: (() => { const s2 = require('./lib/sms').active(); return s2.configured ? s2.name : 'dev'; })(), ussd: config.USSD_SECRET ? 'on' : 'off', turn: config.TURN_URL ? 'on' : 'stun-only', routing: config.ROUTING_URL ? 'on' : 'straight-line' } };
     if (config.configProblem) out.problem = config.configProblem;
     try { await db.init(); await db.store.ping(); out.db = db.kind; } catch (e) { out.ok = false; out.db = 'error'; out.problem = out.problem || 'Database not reachable'; }
@@ -38,7 +38,9 @@ function createApp({ serveStatic = false } = {}) {
     db.init().then(() => bootstrap.ensure()).then(() => require('./lib/settings').load()).then(() => next(), next);
   });
   app.use('/api', cookieParser());
-  app.use('/api', express.json({ limit: '200kb', verify: (req, res, buf) => { if (/^\/api\/(pay\/[a-z]+|whatsapp)\/webhook/.test(req.originalUrl)) req.rawBody = buf.toString('utf8'); } }));
+  // scanned documents and signatures: one file per request, up to about 4 MB (Netlify functions take up to 6 MB)
+  app.use(['/api/docs', '/api/me/documents'], express.json({ limit: '6mb' }));
+  app.use('/api', express.json({ limit: '200kb', verify: (req, res, buf) => { if (/^\/api\/(pay\/[a-z]+|whatsapp|wearables)\/webhook/.test(req.originalUrl)) req.rawBody = buf.toString('utf8'); } }));
   app.use('/api', express.urlencoded({ extended: false, limit: '20kb' }));
   app.use('/api', apiGuard);
   app.use('/api', loadSession);

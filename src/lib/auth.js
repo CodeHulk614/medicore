@@ -178,7 +178,7 @@ function apiGuard(req, res, next) {
     if (req.method === 'OPTIONS') { res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-MC-App, X-MC-Lang, X-MC-Provider'); res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE'); return res.status(204).end(); }
   }
   const safe = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-  const exempt = /^\/api\/(pay\/[a-z]+\/webhook|ussd|health|whatsapp\/webhook)(\/|\?|$)/.test(req.originalUrl);
+  const exempt = /^\/api\/(pay\/[a-z]+\/webhook|ussd|health|whatsapp\/webhook|wearables\/webhook\/[a-z]+)(\/|\?|$)/.test(req.originalUrl);
   if (!safe && !exempt && !req.headers['x-mc-app']) return res.status(403).json({ error: 'Missing app header', code: 'csrf' });
   next();
 }

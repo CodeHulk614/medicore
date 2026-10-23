@@ -70,12 +70,12 @@ test('registering a phone that already exists is refused (use link instead)', as
 
 test('patient self-registration claims a record a provider created', async () => {
   const fd = await h.as('frontdesk', 'reception@lekkifamily.demo');
-  const reg = await fd.post('/api/fd/patients', { firstName: 'Nkem', lastName: 'Obi', dob: '1999-01-01', sex: 'female', phone: '08061112222', consent: true, noKnownAllergies: true });
+  const reg = await fd.post('/api/fd/patients', { firstName: 'Nkem', lastName: 'Obi', dob: '1999-01-01', sex: 'female', phone: '08061112222', consent: true, noKnownAllergies: true, nin: '22223334445' });
   assert.equal(reg.status, 200);
   const pc = h.client('patient');
   const s = await pc.post('/api/patients/register/start', { phone: '08061112222' });
   assert.equal(s.status, 200); assert.ok(s.body.devCode);
-  const done = await pc.post('/api/patients/register', { phone: '08061112222', code: s.body.devCode, firstName: 'Nkem', lastName: 'Obi', password: 'Strong2026pw', consent: true });
+  const done = await pc.post('/api/patients/register', { phone: '08061112222', code: s.body.devCode, firstName: 'Nkem', lastName: 'Obi', password: 'Strong2026pw', consent: true, nin: '22223334445' });
   assert.equal(done.status, 200); assert.equal(done.body.patientId, reg.body.patient.id);
   const prov = await pc.get('/api/me/providers');
   assert.equal(prov.body.length, 1); assert.equal(prov.body[0].name, 'Lekki Family Clinic');

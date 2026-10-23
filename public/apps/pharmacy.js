@@ -934,6 +934,7 @@
       { href: '#/stock', label: MC.t('pharmacy.nav.stock', 'Stock'), icon: 'box', anyPerm: R },
       MC.referrals.navItem(),
       MC.whatsapp.navItem(),
+      MC.caretools.nav.shares({ sideOnly: true }),
       { href: '#/deliveries', label: MC.t('pharmacy.nav.deliveries', 'Deliveries'), icon: 'truck', perm: 'delivery.dispatch', module: 'delivery', show: () => MC.feature('homeDelivery') },
       { href: '#/riders', label: MC.t('pharmacy.nav.riders', 'Riders'), icon: 'users', perm: 'delivery.dispatch', module: 'delivery' },
       { href: '#/po', label: MC.t('pharmacy.nav.po', 'Purchase orders'), short: MC.t('pharmacy.nav.po_short', 'Orders'), icon: 'file', anyPerm: R, sideOnly: true },
@@ -948,6 +949,7 @@
       '#/controlled': controlledPage, '#/reports': reportsPage, '#/deliveries': deliveriesPage, '#/deliveries/:id': deliveryPage, '#/riders': ridersPage,
       ...MC.referrals.routes('#/referrals'),
       ...MC.whatsapp.routes('#/whatsapp'),
+      ...MC.caretools.routes({ patientHref: () => '#/shared-care' }),
     },
     onReady: async me => {
       MC.referrals.refreshCount();

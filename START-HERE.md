@@ -64,6 +64,8 @@ To make a random secret: open any browser, press F12, Console, paste `crypto.get
 | `/group.html` | The head office of a hospital group: every branch, staff in every branch, consolidated subscription and reports |
 | `/hq.html` | The MediCore team (you and your developers) |
 
+Version 2.3 adds the collaborative marketplace: the patient marketplace (map, provider pages, stock, subscription), shared care between providers, documents (scans, verifiable letters, signed consent forms), stores and beds, public hospitals and emergency transfers, and HMOs running plans, networks and capitation on MediCore. See `docs/api/marketplace.md`. Anyone can check a MediCore letter at `/register.html#/verify`.
+
 Each page installs as its own phone app: open it in Chrome on Android, menu > **Install app** (iPhone: Safari > Share > Add to Home Screen).
 
 ## Demo mode accounts (only when `DEMO_MODE=1`)
@@ -89,9 +91,27 @@ Password for all: `Demo2026!`. HQ: `hq@medicore.demo`. Providers: Grandville Hos
 | Each provider's own WhatsApp numbers added to the platform's WhatsApp Business account (optional) | Chats on a hospital's or department's own number arrive in that department's inbox | Meta Business Manager, then the number's phone number ID in Admin > Contact numbers |
 | An email gateway (SendGrid, Brevo, Mailgun or Resend) with a verified sender address | Pre-authorisation requests and claim files to HMOs that are not on the platform | HQ > Integrations > Email |
 | Systems that should receive events (bank, ERP, HMO claims system) | Optional: send referrals, payments and approvals to them automatically | HQ > Connectors |
+| A verified list of public hospitals (government teaching hospitals, federal medical centres, general hospitals, PHCs) with emergency and referral-desk numbers, for example an export from the Federal Ministry of Health facility registry plus calls to check each number | Emergency transfers and the "hospitals near me" map. The demo listings are fictional | HQ > Public hospitals > Import a spreadsheet |
+| NHIA accreditation of each HMO you approve, and its provider agreements | HMOs selling plans and paying capitation through MediCore | HQ > Compliance (NHIA item); check before approving the HMO |
+| An account with a NIN verification partner licensed by NIMC (for example Dojah, Prembly, YouVerify or Smile ID), a data processing agreement, and per-check credit (about NGN 60 a check) | Automatic NIN checks when patients sign up and when providers and HMOs register them. Without it, NINs are saved as pending and staff confirm them by hand | HQ > Integrations > Video, maps, USSD and AI > NIN verification; HQ > Compliance (NIMC item) |
+| A Google Play developer account (USD 25) and an Apple developer account (USD 99 a year), and the MediCore phone app built natively | Reading Android Health Connect and Apple Health (browsers cannot), and background GPS for the ambulance crew and rider apps | Built during product completion; everything else stays a web app |
+| A wearables partner account, for example Terra (from about USD 499 a month for about 500 connected users) | Watch brands' cloud accounts: Garmin, Withings, Oura, Polar, Huawei. Not needed for the phone app, Bluetooth or typed readings | HQ > Integrations > Wearables partner; webhook /api/wearables/webhook/terra |
+| Marketplace prices that make sense with the bank charge (consider quarterly or yearly access) | Patients pay MediCore for marketplace access through the payment gateway | HQ > Configuration > Processes > Patient marketplace |
 
 Track every registration and agreement in **HQ > Compliance**. An item there can be set to *enforce*: until it is marked done, the features it lists stay switched off everywhere (for example PCN registration blocks the open pharmacy marketplace, HEFAMAA blocks video visits).
 
 ## Running it on your own computer (optional)
 
 Install Node.js 20+, then in the folder: `npm install`, then `DEMO_MODE=1 npm start` (Windows PowerShell: `$env:DEMO_MODE=1; npm start`) and open http://localhost:4000/hq.html. Run the automated tests with `npm test`.
+
+## What changed in v2.4 (October 2026)
+
+- Patients register with a NIN, checked with a licensed NIMC partner. The NIN itself is never stored, only a keyed fingerprint and the last 4 digits. Staff can register without one when they give a reason (a child, an emergency, not yet enrolled).
+- A self-registered patient joins their first provider free; joining more needs the marketplace subscription (NGN 2,500 a month, 6,750 a quarter, 25,000 a year). Referrals and shared care between providers stay free.
+- HMOs register their clients as an institution (HMO app > Members > Register a client). Providers that find a patient by NIN see the HMO and whether they are in its network; after the patient's code they see the plan, validity, primary provider and claims.
+- Patients with no HMO browse and buy any HMO's plans free; patients who already have cover need the marketplace to compare others. A network provider can start an HMO plan for an uninsured patient at the desk.
+- Every staff member has a cryptographic staff ID (anyone can check it at /api/verify/staff/ID). Every clock-in is signed and numbered, and Admin > Attendance > Check the records shows any record edited or deleted.
+- Emergency SOS: any patient can call any nearby ambulance service, with no subscription; the trip is billed to the patient's account.
+- One person, one record: every patient gets a MediCore patient ID for life (MCP-XXXX-XXXX). A second record is refused when the NIN, phone or email already exists; providers find the person by NIN, patient ID, phone or email and link them with the patient's code.
+- Health devices (Patient app > More > Health devices): readings from the phone's health app (Android Health Connect, Apple Health) arrive through the MediCore phone app; watch brands (Garmin, Withings, Oura, Polar, Huawei) through a wearables partner (HQ > Integrations > Wearables partner); Bluetooth heart-rate devices in Chrome on Android; home devices typed in. Providers the patient shares with see the readings, and a doctor can ask for a fresh reading during a video visit. Summaries use the AI assistant when it is on, and plain rules otherwise.
+

@@ -547,4 +547,10 @@ async function seedDemo(ctx) {
     $push: { timeline: { $each: [tl('sample_collected', t0 - 30 * 60000, hl), tl('in_progress', t0 - 20 * 60000, hl)] } } });
 }
 
-module.exports = { name: 'lab', router, seedDemo, createLabOrder, resultsForPatient, TRANSITIONS };
+/** a lab's active tests as patients see them (marketplace) */
+async function publicTests(orgId) {
+  const rows = await db.col('lab_catalog').find({ orgId, active: true }, { sort: { code: 1 } });
+  return rows.filter(r => labtests.BY_CODE[r.code]).map(r => { const v = catalogView(r); return { code: v.code, name: v.name, specimen: v.specimen, priceKobo: v.priceKobo, tatHours: v.tatHours }; });
+}
+
+module.exports = { name: 'lab', router, seedDemo, createLabOrder, resultsForPatient, publicTests, TRANSITIONS };

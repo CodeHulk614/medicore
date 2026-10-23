@@ -142,6 +142,7 @@
       <p class="notice">${MC.t('admin.hmos.explain', 'Claims to HMOs on MediCore flow automatically. Other HMOs get pre-authorisation requests from your staff by email or WhatsApp, and claim files by email.')}</p>
       ${d.emailReady ? html`<div class="notice ok">${MC.t('admin.hmos.email_ready', 'Email sending is set up. MediCore can email pre-authorisation requests and claim files to HMOs.')}</div>`
         : html`<div class="notice warn">${MC.t('admin.hmos.email_off', 'Email sending is not set up yet, so MediCore cannot email HMOs for you. Staff can still send requests by WhatsApp and download claim files. Ask MediCore support to set up email.')}</div>`}
+      ${await hmoNetworkBox()}
       <section class="panel flush"><h2>${MC.t('admin.hmos.accepted', 'Accepted now')}</h2>${act.length ? html`<ul class="list">${act.map(row)}</ul>` : empty({ icon: 'shield', title: MC.t('admin.hmos.empty', 'No HMOs yet'), body: MC.t('admin.hmos.empty_sub', 'Add the HMOs you are accredited with so your front desk can check cover and bill them.') })}</section>
       ${old.length ? html`<section class="panel flush"><h2>${MC.t('admin.hmos.stopped', 'No longer accepted')}</h2><ul class="list">${old.map(row)}</ul></section>` : ''}`);
 
@@ -429,10 +430,16 @@
   }
 
   /* ---------------- attendance ---------------- */
+  on('att-verify', async () => {
+    const r = await api.get('/api/shift/attendance/verify');
+    MC.view(html`<div class="notice ${r.intact ? 'ok' : 'bad'}">${r.intact ? MC.t('admin.attendance.intact', '{n} signed records checked. None was edited or deleted.', { n: r.checked })
+      : MC.t('admin.attendance.broken', '{n} records checked: {t} edited after the fact, {m} missing from the sequence. Look into these before paying wages.', { n: r.checked, t: r.tampered.length, m: r.missingSeq.length })}</div>`, document.getElementById('att-check'));
+  });
   async function attendance() {
     const rows = await api.get('/api/shift/attendance');
-    view(html`<div class="page-head"><div><h1>${MC.t('admin.attendance.title', 'Attendance')}</h1><p>${MC.t('admin.attendance.sub', 'Clock-ins for the last 14 days')}</p></div></div>
-      ${rows.length ? html`<div class="table-wrap"><table class="t stack-sm"><thead><tr><th>${MC.t('admin.attendance.col.name', 'Name')}</th><th>${MC.t('admin.attendance.col.role', 'Role')}</th><th>${MC.t('admin.attendance.col.in', 'Clocked in')}</th><th>${MC.t('admin.attendance.col.out', 'Clocked out')}</th><th class="num">${MC.t('admin.attendance.col.hours', 'Hours')}</th><th>${MC.t('admin.attendance.col.location', 'Location')}</th></tr></thead><tbody>${rows.map(s => html`<tr><td data-label="${MC.t('admin.attendance.col.name', 'Name')}"><b>${s.name}</b></td><td data-label="${MC.t('admin.attendance.col.role', 'Role')}">${cap(s.role)}</td><td data-label="${MC.t('admin.attendance.label.in', 'In')}">${dateTime(s.in)}</td><td data-label="${MC.t('admin.attendance.label.out', 'Out')}">${s.out ? dateTime(s.out) : badge(MC.t('admin.attendance.on_shift', 'On shift'), 'ok')}</td><td class="num" data-label="${MC.t('admin.attendance.col.hours', 'Hours')}">${s.minutes != null ? (s.minutes / 60).toFixed(1) : ''}</td><td data-label="${MC.t('admin.attendance.col.location', 'Location')}">${s.onSite === true ? badge(MC.t('admin.attendance.on_site', 'On site'), 'ok') : s.onSite === false ? badge(MC.t('admin.attendance.away', '{m} m away', { m: s.distanceM }), 'warn') : badge(MC.t('admin.attendance.no_location', 'No location'), 'outline')}</td></tr>`)}</tbody></table></div>` : empty({ icon: 'clock', title: MC.t('admin.attendance.empty', 'No clock-ins yet') })}`);
+    view(html`<div class="page-head"><div><h1>${MC.t('admin.attendance.title', 'Attendance')}</h1><p>${MC.t('admin.attendance.sub2', 'Clock-ins for the last 14 days, with the time and place of each. Every record is signed with the staff member\'s unique staff ID, so an edited or deleted record shows up in the check.')}</p></div>
+      <div class="actions"><button class="btn" data-action="att-verify">${icon('shield')}${MC.t('admin.attendance.verify', 'Check the records')}</button></div></div><div id="att-check"></div>
+      ${rows.length ? html`<div class="table-wrap"><table class="t stack-sm"><thead><tr><th>${MC.t('admin.attendance.col.name', 'Name')}</th><th>${MC.t('admin.attendance.col.uid', 'Staff ID')}</th><th>${MC.t('admin.attendance.col.role', 'Role')}</th><th>${MC.t('admin.attendance.col.in', 'Clocked in')}</th><th>${MC.t('admin.attendance.col.out', 'Clocked out')}</th><th class="num">${MC.t('admin.attendance.col.hours', 'Hours')}</th><th>${MC.t('admin.attendance.col.location', 'Location')}</th></tr></thead><tbody>${rows.map(s => html`<tr><td data-label="${MC.t('admin.attendance.col.name', 'Name')}"><b>${s.name}</b></td><td data-label="${MC.t('admin.attendance.col.uid', 'Staff ID')}">${s.staffUid ? html`<code>${s.staffUid}</code> ${s.intact === true ? badge(MC.t('admin.attendance.signed', 'Signed'), 'ok') : s.intact === false ? badge(MC.t('admin.attendance.altered', 'Altered'), 'bad') : ''}` : html`<span class="muted">-</span>`}</td><td data-label="${MC.t('admin.attendance.col.role', 'Role')}">${cap(s.role)}</td><td data-label="${MC.t('admin.attendance.label.in', 'In')}">${dateTime(s.in)}</td><td data-label="${MC.t('admin.attendance.label.out', 'Out')}">${s.out ? dateTime(s.out) : badge(MC.t('admin.attendance.on_shift', 'On shift'), 'ok')}</td><td class="num" data-label="${MC.t('admin.attendance.col.hours', 'Hours')}">${s.minutes != null ? (s.minutes / 60).toFixed(1) : ''}</td><td data-label="${MC.t('admin.attendance.col.location', 'Location')}">${s.onSite === true ? badge(MC.t('admin.attendance.on_site', 'On site'), 'ok') : s.onSite === false ? badge(MC.t('admin.attendance.away', '{m} m away', { m: s.distanceM }), 'warn') : badge(MC.t('admin.attendance.no_location', 'No location'), 'outline')}</td></tr>`)}</tbody></table></div>` : empty({ icon: 'clock', title: MC.t('admin.attendance.empty', 'No clock-ins yet') })}`);
   }
 
   /* ---------------- audit ---------------- */
@@ -592,6 +599,73 @@
   /* ---------------- more (phones) ---------------- */
   const navAllowed = n => (!n.show || n.show(MC.me)) && (!n.perm || has(n.perm)) && (!n.anyPerm || n.anyPerm.some(has));
   const navLabel = l => (l && l.mcKey ? MC.t(l.mcKey, l.mcFallback) : String(l));
+  /* ================= marketplace profile ================= */
+  const AT = (k, en, v) => MC.t('admin.mk.' + k, en, v);
+  async function marketPage({ stale }) {
+    const d = await api.get('/api/admin/market-profile'); if (stale()) return;
+    const pr = d.profile || {};
+    view(html`<div class="page-head"><div><h1>${AT('title', 'Marketplace page')}</h1><p>${AT('sub', 'How patients find you on the MediCore marketplace map')}</p></div></div>
+      ${d.marketplaceOn ? '' : html`<div class="notice warn">${AT('off', 'The marketplace is switched off on MediCore for now. Your settings are kept for when it opens.')}</div>`}
+      ${figures([{ value: d.stats.views30d, label: AT('views', 'Patients who opened your page (30 days)') }, { value: d.stats.joins30d, label: AT('joins', 'Patients who joined through the marketplace (30 days)') }])}
+      <form class="panel" data-form="mk-save" novalidate>
+        <label class="check"><input type="checkbox" name="listed" ${d.listed ? 'checked' : ''}><span><b>${AT('listed', 'Show us on the marketplace')}</b><br><span class="sm muted">${AT('listed_h', 'Patients who pay for the marketplace, and members of HMOs you work with, can find you, book, order and join.')}</span></span></label>
+        <label class="check"><input type="checkbox" name="autoRegister" ${d.autoRegister ? 'checked' : ''}><span><b>${AT('auto', 'Register marketplace patients at once')}</b><br><span class="sm muted">${AT('auto_h', 'When off, patients from the marketplace wait for your front desk to approve them.')}</span></span></label>
+        <label class="check"><input type="checkbox" name="showInventory" ${d.showInventory ? 'checked' : ''}><span><b>${AT('inv', 'Show what is in stock')}</b><br><span class="sm muted">${AT('inv_h', 'Patients see available, running low or out of stock for your medicines and the store items you mark as public, never quantities.')}</span></span></label>
+        <label class="check"><input type="checkbox" name="showPrices" ${d.showPrices ? 'checked' : ''}><span><b>${AT('prices', 'Show prices')}</b></span></label>
+        <div class="field"><label for="mk-a">${AT('about', 'About you')}</label><textarea class="input" id="mk-a" name="about" maxlength="800" rows="3">${pr.about || ''}</textarea></div>
+        <div class="field"><label for="mk-f">${AT('facilities', 'Facilities (comma separated)')}</label><input class="input" id="mk-f" name="facilities" value="${(pr.facilities || []).join(', ')}" placeholder="${AT('facilities_ph', '24-hour emergency, Parking, Wheelchair access')}"></div>
+        <div class="field"><label for="mk-l">${AT('langs', 'Languages your staff speak (comma separated)')}</label><input class="input" id="mk-l" name="languages" value="${(pr.languages || []).join(', ')}" placeholder="English, Yoruba, Pidgin"></div>
+        <h2>${AT('loc', 'Map location')}</h2>${d.hasLocation ? html`<p class="muted sm">${AT('loc_set', 'Your location is set. Patients see you on the map.')}</p>` : html`<div class="notice warn">${AT('loc_none', 'Your location is not set, so you do not appear on the map. Stand at your entrance and use your location.')}</div>`}
+        <div class="fields two"><div class="field"><label for="mk-lat">${AT('lat', 'Latitude')}</label><input class="input" id="mk-lat" name="lat" type="number" step="any"></div><div class="field"><label for="mk-lng">${AT('lng', 'Longitude')}</label><input class="input" id="mk-lng" name="lng" type="number" step="any"></div></div>
+        <button class="btn" type="button" data-action="mk-here">${icon('pin')}${AT('here', 'Use my current location')}</button>
+        <div class="form-err notice bad" hidden></div><div class="btn-row"><button class="btn primary" type="submit">${AT('save', 'Save marketplace page')}</button></div></form>`);
+  }
+  on('mk-here', async () => { const p = await MC.position(); if (!p) return toast(AT('no_gps', 'Location is not available on this device'), 'bad'); document.getElementById('mk-lat').value = p.lat.toFixed(6); document.getElementById('mk-lng').value = p.lng.toFixed(6); toast(AT('got_gps', 'Location found. Save to keep it.'), 'ok'); });
+  form('mk-save', async d => {
+    const list = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
+    const b = { listed: !!d.listed, autoRegister: !!d.autoRegister, showInventory: !!d.showInventory, showPrices: !!d.showPrices, about: d.about || '', facilities: list(d.facilities), languages: list(d.languages) };
+    if (d.lat != null && d.lng != null) b.location = { lat: d.lat, lng: d.lng };
+    await api.patch('/api/admin/market-profile', b); toast(AT('saved', 'Marketplace page saved'), 'ok'); MC.render();
+  });
+
+  /* ================= consent form templates ================= */
+  async function formsPage({ stale }) {
+    const d = await api.get('/api/admin/form-templates'); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${AT('forms', 'Consent forms')}</h1><p>${AT('forms_sub', 'Forms patients sign on the tablet. MediCore provides the standard ones; add your own.')}</p></div><div class="actions"><button class="btn primary" data-action="ft-new">${icon('plus')}${AT('ft_new', 'New form')}</button></div></div>
+      <section class="panel flush"><h2>${AT('ft_yours', 'Your forms')}</h2>${d.custom.length ? html`<ul class="list">${d.custom.map(f => html`<li><div class="grow"><span class="title">${f.title} ${f.active === false ? badge(AT('ft_off', 'Not in use'), 'warn') : ''}</span><span class="sub">${(f.fields || []).length} ${AT('ft_fields', 'fields')}${f.requireWitness ? ' | ' + AT('ft_witness', 'needs a witness') : ''}</span></div><span class="end"><button class="btn sm" data-action="ft-edit" data-id="${f.id}">${MC.t('admin.hmos.edit', 'Edit')}</button></span></li>`)}</ul>` : empty({ icon: 'edit', title: AT('ft_none', 'No forms of your own yet') })}</section>
+      <section class="panel flush"><h2>${AT('ft_std', 'Standard forms')}</h2><ul class="list">${d.standard.map(f => html`<li><div class="grow"><span class="title">${f.title}</span><span class="sub">${f.body.slice(0, 140)}...</span></div></li>`)}</ul></section>`);
+    const dlg = f => dialog({ title: f ? f.title : AT('ft_new', 'New form'), wide: true, form: true, body: html`
+      <div class="fields two"><div class="field"><label for="ft-t">${AT('ft_title', 'Title')}</label><input class="input" id="ft-t" name="title" required maxlength="120" value="${f ? f.title : ''}"></div><div class="field"><label for="ft-k">${AT('ft_kind', 'Kind')}</label><select class="input" id="ft-k" name="kind">${['consent', 'admission', 'procedure', 'hmo', 'other'].map(k => html`<option value="${k}" ${f && f.kind === k ? 'selected' : ''}>${cap(k)}</option>`)}</select></div></div>
+      <div class="field"><label for="ft-b">${AT('ft_body', 'Text')}</label><textarea class="input" id="ft-b" name="body" required rows="6" maxlength="6000">${f ? f.body : ''}</textarea><div class="hint">${AT('ft_body_h', 'Use {{patientName}}, {{providerName}}, {{signerName}}, {{date}} and your own fields, for example {{procedure}}.')}</div></div>
+      <div class="field"><label for="ft-f">${AT('ft_fieldlist', 'Fields, one per line: key | label | required (yes or no)')}</label><textarea class="input" id="ft-f" name="fieldsText" rows="4">${f ? (f.fields || []).map(x => x.key + ' | ' + x.label + ' | ' + (x.required ? 'yes' : 'no')).join('\n') : ''}</textarea></div>
+      <label class="check"><input type="checkbox" name="requireWitness" ${f && f.requireWitness ? 'checked' : ''}><span>${AT('ft_needs_w', 'Needs a witness')}</span></label>
+      ${f ? html`<label class="check"><input type="checkbox" name="active" ${f.active !== false ? 'checked' : ''}><span>${AT('ft_in_use', 'In use')}</span></label>` : ''}`,
+      actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: AT('ft_save', 'Save form'), primary: true }],
+      onSubmit: x => { const fields = String(x.fieldsText || '').split('\n').map(l => l.split('|').map(s => s.trim())).filter(a => a[0]).map(([key, label, req]) => ({ key, label: label || key, type: 'text', required: /^y/i.test(req || '') })); const b = { title: x.title, kind: x.kind, body: x.body, requireWitness: !!x.requireWitness, fields }; if (f) b.active = !!x.active; return f ? api.patch('/api/admin/form-templates/' + f.id, b) : api.post('/api/admin/form-templates', b); } });
+    on('ft-new', async () => { if (await dlg(null)) MC.render(); });
+    on('ft-edit', async el => { if (await dlg(d.custom.find(x => x.id === el.dataset.id))) MC.render(); });
+  }
+
+  /* ================= HMO networks and capitation ================= */
+  async function hmoNetworkBox() {
+    let rows; try { rows = await api.get('/api/admin/hmo-network'); } catch (e) { return ''; }
+    if (!rows.length) return '';
+    const st = s => badge(AT('nw_' + s, cap(s)), s === 'active' ? 'ok' : s === 'invited' ? 'warn' : s === 'declined' || s === 'ended' ? 'bad' : '');
+    return html`<section class="panel flush"><h2>${AT('nw_title', 'HMO networks on MediCore')}</h2><ul class="list">${rows.map(r => html`<li><div class="grow"><span class="title">${r.hmoName} ${st(r.status)}</span><span class="sub">${[cap(r.level), r.primaryCare ? AT('nw_primary', 'Primary care, capitation {m} per enrollee a month', { m: money(r.capitationKobo) }) : null, r.primaryCare ? AT('nw_enrollees', '{n} enrollees chose you', { n: r.enrollees }) : null, r.note].filter(Boolean).join(' | ')}</span></div>
+      <span class="end">${r.status === 'invited' ? html`<button class="btn sm primary" data-action="nw-act" data-id="${r.id}" data-a="accept">${AT('nw_accept', 'Join network')}</button><button class="btn sm" data-action="nw-act" data-id="${r.id}" data-a="decline">${AT('nw_decline', 'Decline')}</button>` : r.status === 'active' ? html`<a class="btn sm" href="#/capitation">${AT('nw_cap', 'Capitation')}</a><button class="btn sm" data-action="nw-act" data-id="${r.id}" data-a="leave">${AT('nw_leave', 'Leave')}</button>` : ''}</span></li>`)}</ul></section>`;
+  }
+  on('nw-act', async el => {
+    const a = el.dataset.a; let reason;
+    if (a !== 'accept') { const v = await dialog({ title: a === 'leave' ? AT('nw_leave', 'Leave') : AT('nw_decline', 'Decline'), form: true, body: html`<div class="field"><label for="nw-r">${AT('nw_reason', 'Reason')}</label><input class="input" id="nw-r" name="reason" required maxlength="300"></div>`, actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: MC.t('kit.confirm', 'Confirm'), primary: true }] }); if (!v) return; reason = v.reason; }
+    await api.post('/api/admin/hmo-network/' + el.dataset.id + '/' + a, { reason }); toast(a === 'accept' ? AT('nw_joined', 'You joined the network. The HMO is now on your list.') : AT('nw_done', 'Done'), 'ok'); MC.render();
+  });
+  async function capitationPage({ stale }) {
+    const d = await api.get('/api/hmo/capitation'); if (stale()) return;
+    view(html`<div class="page-head"><div><h1>${AT('cap_title', 'Capitation')}</h1><p>${AT('cap_sub', 'What HMOs pay you each month for the enrollees who chose you as their primary provider')}</p></div></div>
+      <section class="panel flush"><h2>${AT('cap_month', 'This month ({m})', { m: d.month })}</h2>${d.current.length ? html`<ul class="list">${d.current.map(c => html`<li><div class="grow"><span class="title">${c.hmoName}: ${money(c.amountKobo)}</span><span class="sub">${AT('cap_calc', '{n} enrollees x {r}', { n: c.enrollees, r: money(c.rateKobo) })}</span></div>${c.paid ? badge(AT('cap_paid', 'Paid'), 'ok') : badge(AT('cap_due', 'Not paid yet'), 'warn')}</li>`)}</ul>` : empty({ icon: 'heart', title: AT('cap_none', 'No primary care HMO networks yet') })}</section>
+      <section class="panel flush"><h2>${AT('cap_history', 'Payments received')}</h2>${d.payments.length ? html`<ul class="list">${d.payments.map(p => html`<li><div class="grow"><span class="title">${p.hmoName} | ${p.month}: ${money(p.amountKobo)}</span><span class="sub">${AT('cap_calc', '{n} enrollees x {r}', { n: p.enrollees, r: money(p.rateKobo) })} | ${p.reference} | ${date(p.paidAt)}</span></div></li>`)}</ul>` : empty({ icon: 'card', title: AT('cap_no_pay', 'No capitation recorded yet') })}</section>`);
+  }
+
   async function more() {
     const items = NAV.filter(n => n.sideOnly && navAllowed(n));
     view(html`<div class="page-head"><div><h1>${MC.t('admin.more.title', 'More')}</h1><p>${MC.me.org ? MC.me.org.name : ''} | ${MC.me.roleLabel || ''}</p></div></div>
@@ -610,6 +684,10 @@
     { href: '#/settings', label: MC.t('admin.nav.settings', 'Settings'), icon: 'settings', perm: 'admin.settings', sideOnly: true },
     { href: '#/contacts', label: MC.t('admin.nav.contacts', 'Contact numbers'), icon: 'phone', anyPerm: ['admin.settings', 'admin.staff', 'admin.reports'], sideOnly: true },
     { href: '#/hmos', label: MC.t('admin.nav.hmos', 'HMOs we accept'), icon: 'heart', anyPerm: ['admin.settings', 'admin.finance'], show: me => !(me.org && me.org.type === 'hmo'), sideOnly: true },
+    { href: '#/capitation', label: MC.t('admin.nav.capitation', 'HMO capitation'), icon: 'card', anyPerm: ['admin.finance', 'admin.reports'], show: me => !(me.org && me.org.type === 'hmo') && MC.feature('hmoNetwork'), sideOnly: true },
+    { href: '#/marketplace', label: MC.t('admin.nav.marketplace', 'Marketplace page'), icon: 'globe', perm: 'admin.settings', show: me => !(me.org && me.org.type === 'hmo'), sideOnly: true },
+    { href: '#/forms', label: MC.t('admin.nav.forms', 'Consent forms'), icon: 'edit', perm: 'admin.settings', show: me => !(me.org && me.org.type === 'hmo') && MC.feature('documents'), sideOnly: true },
+    Object.assign({}, MC.caretools.nav.store(), { sideOnly: true, show: me => !(me.org && me.org.type === 'hmo') && MC.feature('inventory') }),
     Object.assign({}, MC.whatsapp.navItem(), { sideOnly: true }),
     { href: '#/support', label: MC.t('admin.nav.support', 'Support'), icon: 'message', anyPerm: ['admin.settings', 'admin.staff', 'admin.reports'], sideOnly: true },
     { href: '#/audit', label: MC.t('admin.nav.audit', 'Audit log'), short: MC.t('admin.nav.audit_short', 'Audit'), icon: 'shield', perm: 'admin.audit', sideOnly: true },
@@ -620,7 +698,8 @@
     nav: NAV,
     routes: { '#/': overview, '#/staff': staff, '#/services': services, '#/settings': settings, '#/subscription': subscription, '#/support': support, '#/support/new': supportNew, '#/support/:id': supportView, '#/attendance': attendance, '#/audit': audit, '#/contacts': contactsPage, '#/hmos': hmoPage,
       '#/network': netDirectory, '#/network/p/:id': netProvider, '#/network/partners': netPartners, '#/network/messages': netMessages, '#/network/messages/:id': netThread, '#/more': more,
-      ...MC.whatsapp.routes('#/whatsapp', {}) },
+      '#/marketplace': marketPage, '#/forms': formsPage, '#/capitation': capitationPage,
+      ...MC.whatsapp.routes('#/whatsapp', {}), ...MC.caretools.routes({ patientHref: () => '#/' }) },
     onReady: () => { netCounts().catch(() => { }); MC.whatsapp.refreshCount(); },
   });
 })();

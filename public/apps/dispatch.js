@@ -579,8 +579,10 @@
       { href: '#/metrics', label: T('dispatch.nav.metrics', 'Response times'), short: T('dispatch.nav.metrics_short', 'Metrics'), icon: 'chart', perm: 'ambulance.fleet' },
       MC.referrals.navItem(),
       MC.whatsapp.navItem(),
+      MC.caretools.nav.transfers({ label: MC.t('ct.nav.hospitals', 'Hospitals and transfers'), short: MC.t('ct.nav.hospitals_short', 'Hospitals') }),
+      MC.caretools.nav.store({ sideOnly: true }),
     ],
-    routes: { '#/board': board, '#/new': newCall, '#/incident/:id': incidentPage, '#/incidents': history, '#/fleet': fleet, '#/metrics': metrics, ...MC.referrals.routes('#/referrals'), ...MC.whatsapp.routes('#/whatsapp') },
+    routes: { '#/board': board, '#/new': newCall, '#/incident/:id': incidentPage, '#/incidents': history, '#/fleet': fleet, '#/metrics': metrics, ...MC.referrals.routes('#/referrals'), ...MC.whatsapp.routes('#/whatsapp'), ...MC.caretools.routes({ patientHref: () => '#/board' }) },
     onReady: async () => { MC.referrals.refreshCount(); MC.whatsapp.refreshCount(); try { const b = await api.get('/api/dispatch/board'); cats = b.categories; setCounts(b); } catch (e) { /* board loads on its own */ } },
   });
 })();

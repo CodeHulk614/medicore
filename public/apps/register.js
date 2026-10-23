@@ -66,7 +66,7 @@
   }
 
   /* ---------------- patient sign-up ---------------- */
-  const ps = { step: 1, phone: '', devCode: null, code: '', firstName: '', lastName: '', dob: '', sex: '', allergyMode: '', allergies: [], err: null, jq: '', jt: '', here: null, rows: [], applied: null, locTried: false };
+  const ps = { step: 1, phone: '', devCode: null, code: '', firstName: '', lastName: '', dob: '', sex: '', nin: '', allergyMode: '', allergies: [], err: null, jq: '', jt: '', here: null, rows: [], applied: null, locTried: false };
   // provider mode (the default): a new patient applies to their hospital, clinic, pharmacy or lab right after sign-up
   const provMode = () => (((MC.config() || {}).patients || {}).mode || 'provider') !== 'open';
   const pSteps = () => provMode()
@@ -152,6 +152,7 @@
           <div class="fields two"><div class="field"><label for="p-fn">${T('register.p.first', 'First name')}</label><input class="input" id="p-fn" name="firstName" autocomplete="given-name" maxlength="60" value="${ps.firstName}" required></div>
             <div class="field"><label for="p-ln">${T('register.p.last', 'Last name (surname)')}</label><input class="input" id="p-ln" name="lastName" autocomplete="family-name" maxlength="60" value="${ps.lastName}" required></div></div>
           <div class="field"><label for="p-dob">${T('register.p.dob', 'Date of birth')}</label><input class="input" id="p-dob" name="dob" type="date" max="${MC.todayISO()}" min="1900-01-01" value="${ps.dob}" required><div class="hint">${T('register.p.dob_hint', 'Doctors need your age to choose safe medicine doses.')}</div></div>
+          <div class="field"><label for="p-nin">${T('register.p.nin', 'NIN (National Identification Number)')}</label><input class="input" id="p-nin" name="nin" inputmode="numeric" autocomplete="off" maxlength="11" value="${ps.nin}" required><div class="hint">${T('register.p.nin_hint', '11 digits, on your NIN slip or the NIMC app. It confirms who you are, so hospitals and HMOs can register you without paperwork.')}</div></div>
           <div class="field"><span class="label">${T('register.p.sex', 'Sex')}</span><div class="seg-r">${[['female', T('register.p.female', 'Female')], ['male', T('register.p.male', 'Male')], ['other', T('register.p.other', 'Other')]].map(([v, l]) => html`<label class="opt"><input type="radio" name="sex" value="${v}" ${ps.sex === v ? 'checked' : ''}><span class="grow"><b>${l}</b></span></label>`)}</div></div>
           <div class="form-err notice bad" hidden></div><button class="btn primary lg block" type="submit">${T('register.next', 'Next')}</button></form>`);
       return;
@@ -207,7 +208,9 @@
     if (!d.lastName) throw fail(T('register.p.need_last', 'Type your last name'), 'lastName');
     if (!d.dob) throw fail(T('register.p.need_dob', 'Choose your date of birth'), 'dob');
     if (!d.sex) throw fail(T('register.p.need_sex', 'Choose one'), 'sex');
-    Object.assign(ps, pick(d, ['code', 'firstName', 'lastName', 'dob', 'sex'])); ps.step = 3; ps.err = null; patient();
+    if (!/^\d{11}$/.test(String(d.nin || '').replace(/\s+/g, ''))) throw fail(T('register.p.need_nin', 'Type your 11-digit NIN'), 'nin');
+    d.nin = String(d.nin).replace(/\s+/g, '');
+    Object.assign(ps, pick(d, ['code', 'firstName', 'lastName', 'dob', 'sex', 'nin'])); ps.step = 3; ps.err = null; patient();
   });
   form('p-finish', async d => {
     if (ps.allergyMode !== 'none' && ps.allergyMode !== 'some') throw fail(T('register.p.need_allergy', 'Choose "No known allergies" or add your allergies'), 'allergyMode');
@@ -219,12 +222,13 @@
     const pw = d.password || '';
     if (pw.length < 8 || !/[A-Za-z]/.test(pw) || !/\d/.test(pw)) throw fail(pwRule(), 'password');
     if (!d.consent) throw fail(T('register.p.need_consent', 'Tick the box to agree to the privacy notice'), 'consent');
-    const body = { phone: ps.phone, code: ps.code, firstName: ps.firstName, lastName: ps.lastName, dob: ps.dob, sex: ps.sex, password: pw, consent: true, lang: MC.lang,
+    const body = { phone: ps.phone, code: ps.code, firstName: ps.firstName, lastName: ps.lastName, dob: ps.dob, sex: ps.sex, password: pw, consent: true, lang: MC.lang, nin: ps.nin,
       noKnownAllergies: ps.allergyMode === 'none', allergies: ps.allergyMode === 'some' ? ps.allergies : [] };
     try { await api.post('/api/patients/register', body); }
     catch (e) {
       const codeErr = /code/i.test(e.message) && !(e.details || []).some(x => x.field && x.field !== 'code');
       if (codeErr) { ps.step = 2; ps.err = e.message; patient(); return; }
+      if (/NIN|NIMC/.test(e.message)) { ps.step = 2; ps.err = e.message; patient(); return; }
       throw e;
     }
     // the sign-up call does not store the language yet, so save it on the new profile
@@ -394,5 +398,43 @@
   }
   on('pv-reset', () => { Object.assign(pv, { step: 1, type: null, modules: new Set(), seats: null, period: 'monthly', details: {}, result: null, quote: null }); MC.go('#/'); });
 
-  MC.boot({ title: 'Join MediCore', anonymous: true, home: '#/', routes: { '#/': choose, '#/patient': patient, '#/provider': provider } });
+
+  /* ---------- check a letter or certificate (anyone) ---------- */
+  const LETTERS = { medical_report: 'Medical report', sick_note: 'Sick note', referral_letter: 'Referral letter', discharge_summary: 'Discharge summary', fitness_certificate: 'Medical fitness certificate' };
+  async function verifyPage({ params }) {
+    const code = params && params.code ? params.code : '';
+    view(html`<div class="page-head"><div><h1>${MC.t('register.doc.title', 'Check a MediCore document')}</h1><p>${MC.t('register.doc.sub', 'Type the code printed at the bottom of the letter or certificate.')}</p></div></div>
+      <form class="panel" data-form="v-check" novalidate><div class="field"><label for="v-c">${MC.t('register.doc.code', 'Code')}</label><input class="input" id="v-c" name="code" value="${code}" maxlength="12" autocapitalize="characters" required></div><button class="btn primary" type="submit">${MC.t('register.doc.check', 'Check')}</button></form><div id="v-out"></div>`);
+    if (code) await showVerify(code);
+  }
+  async function showVerify(code) {
+    const r = await api.get('/api/public/verify/' + encodeURIComponent(code));
+    const out = document.getElementById('v-out'); if (!out) return;
+    MC.view(r.valid ? html`<div class="notice ok"><b>${MC.t('register.doc.valid', 'This document is genuine.')}</b><br>${MC.t('register.doc.ltype.' + r.type, LETTERS[r.type] || r.title)} | ${MC.t('register.doc.issued', 'Issued {d} by {p}', { d: r.issuedOn, p: r.provider })}<br>${MC.t('register.doc.signed', 'Signed by {n} ({b} {no})', { n: r.signer ? r.signer.name : '', b: r.signer ? r.signer.licenceBody : '', no: r.signer ? r.signer.licenceNo : '' })}<br>${MC.t('register.doc.patient', 'Patient initials: {i}', { i: r.patientInitials })}${r.restFrom ? html`<br>${MC.t('register.doc.rest', 'Rest from {a} to {b}', { a: r.restFrom, b: r.restTo })}` : ''}</div>`
+      : html`<div class="notice bad"><b>${r.status === 'cancelled' ? MC.t('register.doc.cancelled', 'This document was cancelled by the provider that issued it.') : MC.t('register.doc.invalid', 'No valid document has this code.')}</b><br>${MC.t('register.doc.invalid_sub', 'Check the code, or contact the provider named on the paper.')}</div>`, out);
+  }
+  form('v-check', async d => { history.replaceState(null, '', '#/verify/' + encodeURIComponent(d.code)); await showVerify(d.code); });
+
+  /* ---------- transfer pack for a receiving hospital (no account) ---------- */
+  async function transferPage({ params }) {
+    view(html`<div class="page-head"><div><h1>${MC.t('register.doc.tr.title', 'Patient transfer')}</h1><p>${MC.t('register.doc.tr.sub', 'Enter the 6-digit code the sending hospital gave you by phone.')}</p></div></div>
+      <form class="panel" data-form="tp-open" data-token="${params.token}" novalidate><div class="field"><label for="tp-c">${MC.t('register.doc.tr.code', 'Access code')}</label><input class="input" id="tp-c" name="code" inputmode="numeric" maxlength="6" required></div><div class="form-err notice bad" hidden></div><button class="btn primary" type="submit">${MC.t('register.doc.tr.open', 'Open')}</button></form><div id="tp-out"></div>`);
+  }
+  form('tp-open', async (d, f) => {
+    const r = await api.post('/api/public/transfer/' + encodeURIComponent(f.dataset.token), { code: d.code });
+    const s = r.snapshot || {}; const p = s.patient || {};
+    f.hidden = true;
+    MC.view(html`<section class="panel"><h2>${p.name || ''} ${p.age != null ? '(' + p.age + ')' : ''}</h2><p>${MC.t('register.doc.tr.from', 'From {h}', { h: r.from.name })}${r.from.phone ? ' | ' + r.from.phone : ''} | ${r.number} | ${cap2(r.urgency)}</p>
+      <p><b>${MC.t('register.doc.tr.reason', 'Reason')}</b>: ${r.reason}</p>${r.clinicalNote ? html`<p><b>${MC.t('register.doc.tr.clinical', 'Clinical summary')}</b>: ${r.clinicalNote}</p>` : ''}
+      <dl class="kv"><dt>${MC.t('register.doc.tr.blood', 'Blood group')}</dt><dd>${p.bloodGroup || '-'}</dd><dt>${MC.t('register.doc.tr.geno', 'Genotype')}</dt><dd>${p.genotype || '-'}</dd><dt>${MC.t('register.doc.tr.weight', 'Weight')}</dt><dd>${p.weightKg ? p.weightKg + ' kg' : '-'}</dd>
+        <dt>${MC.t('register.doc.tr.allergies', 'Allergies')}</dt><dd>${(s.allergies || []).length ? s.allergies.map(a => a.substance + (a.reaction ? ' (' + a.reaction + ')' : '')).join(', ') : s.noKnownAllergies ? MC.t('register.doc.tr.nka', 'No known allergies') : MC.t('register.doc.tr.unknown', 'Not recorded')}</dd>
+        <dt>${MC.t('register.doc.tr.conditions', 'Conditions')}</dt><dd>${(s.conditions || []).map(c => c.name).join(', ') || '-'}</dd><dt>${MC.t('register.doc.tr.meds', 'Current medicines')}</dt><dd>${(s.currentMedicines || []).map(m => m.drugName).join(', ') || '-'}</dd></dl>
+      ${s.lastVitals ? html`<p><b>${MC.t('register.doc.tr.vitals', 'Last vitals')}</b>: BP ${s.lastVitals.bpSys || '-'}/${s.lastVitals.bpDia || '-'}, ${MC.t('register.doc.tr.pulse', 'pulse')} ${s.lastVitals.pulse || '-'}, SpO2 ${s.lastVitals.spo2 || '-'}, ${MC.t('register.doc.tr.temp', 'temp')} ${s.lastVitals.tempC || '-'}</p>` : ''}
+      ${(s.recentLabResults || []).length ? html`<h3>${MC.t('register.doc.tr.labs', 'Recent results')}</h3>${s.recentLabResults.map(l => html`<p class="sm">${l.lab || ''} ${l.releasedAt ? date(l.releasedAt) : ''}: ${(l.results || []).map(x => x.name + ' ' + (x.value || '') + (x.unit ? ' ' + x.unit : '') + (x.flag && x.flag !== 'normal' ? ' (' + x.flag + ')' : '')).join('; ')}</p>`)}` : ''}
+      ${(s.recentEncounters || []).length ? html`<h3>${MC.t('register.doc.tr.visits', 'Recent visits')}</h3>${s.recentEncounters.map(e => html`<p class="sm">${e.date} ${e.orgName || ''}: ${(e.diagnoses || []).map(x => x.text).join(', ') || e.complaint || ''}${e.plan ? ' | ' + e.plan : ''}</p>`)}` : ''}
+      <p class="muted sm">${MC.t('register.doc.tr.expires', 'This summary is confidential. The link stops working on {d}.', { d: date(r.expiresAt) })}</p></section>`, document.getElementById('tp-out'));
+  });
+  const cap2 = s => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
+  MC.boot({ title: 'Join MediCore', anonymous: true, home: '#/', routes: { '#/': choose, '#/patient': patient, '#/provider': provider, '#/verify': verifyPage, '#/verify/:code': verifyPage, '#/transfer/:token': transferPage } });
 })();

@@ -305,7 +305,17 @@ async function billIncident(inc) {
   const km = await transportKm(inc);
   const kmSvc = await orgs.service(inc.orgId, 'AMB-KM');
   if (kmSvc && km > 0) lines.push(billing.lineFromService(kmSvc, Math.max(1, Math.ceil(km))));
+  // the service set no ambulance prices: the platform fallback tariff (HQ, process.emergency) still bills the trip
+  if (!lines.length) {
+    const als = unit && unit.type === 'ALS';
+    const callK = Number(S.get(als ? 'process.emergency.fallbackAlsKobo' : 'process.emergency.fallbackCallKobo', 0)) || 0;
+    const perKmK = Number(S.get('process.emergency.fallbackPerKmKobo', 0)) || 0;
+    if (callK > 0) lines.push({ code: als ? 'AMB-ALS' : 'AMB-CALL', name: als ? 'Advanced life support call-out' : 'Emergency call-out', category: 'ambulance', qty: 1, unitPriceKobo: callK });
+    if (perKmK > 0 && km > 0) lines.push({ code: 'AMB-KM', name: 'Per km transported', category: 'ambulance', qty: Math.max(1, Math.ceil(km)), unitPriceKobo: perKmK });
+  }
   if (!lines.length) { await db.col('incidents').updateOne({ id: inc.id }, { $set: { billStatus: 'no_price_list', transportKm: km } }); return null; }
+  const feeK = Number(S.get('process.emergency.bookingFeeKobo', 0)) || 0;
+  if (feeK > 0 && inc.source === 'app') lines.push({ code: 'MC-EMERG', name: 'MediCore emergency booking fee', category: 'platform_fee', qty: 1, unitPriceKobo: feeK, platform: true });
   const bill = await billing.createBill({ orgId: inc.orgId, patientId: inc.patientId, lines, source: { type: 'incident', id: inc.id }, createdBy: 'system', note: 'Ambulance ' + inc.number });
   await db.col('incidents').updateOne({ id: inc.id }, { $set: { billId: bill.id, billStatus: bill.status, transportKm: km } });
   if (bill.status === 'open') await tellPatient(inc, 'Ambulance bill ready', 'Your bill from ' + ((await orgs.getOrg(inc.orgId)) || {}).name + ' is ready in the MediCore app.', false);
@@ -753,7 +763,9 @@ router.post('/me/emergency', A.requirePatient, ah(async (req, res) => {
   const open = await db.col('incidents').findOne({ patientOpenKey: patient.id });
   if (open) return res.json(Object.assign(await patientIncidentView(open), { existing: true }));
   await RL.limit('sos_' + patient.id, 5, 3600, 'You have sent several emergency requests. Call 112 or the provider directly.');
+  if (b.providerOrgId && S.get('process.emergency.patientChoosesService', true) === false) b.providerOrgId = null;
   const route = await routeProvider({ lat: b.lat, lng: b.lng }, b.providerOrgId);
+  // the patient need not be registered with this service: SOS adds them (link reason 'emergency') so the trip can be billed
   await P.ensureLink(route.org.id, patient.id, req.ctx.user.id, 'emergency');
   let inc;
   try {
@@ -766,6 +778,28 @@ router.post('/me/emergency', A.requirePatient, ah(async (req, res) => {
   }
   await audit(req, 'ambulance.sos', { type: 'incident', id: inc.id, patientId: patient.id, orgId: route.org.id }, { category: b.category, chosen: !!b.providerOrgId, noUnit: route.noUnitAvailable });
   res.json(Object.assign(await patientIncidentView(inc), { existing: false, noUnitAvailable: route.noUnitAvailable }));
+}));
+/* ambulance services near the patient, any institute, with what they have free right now. Open to every patient:
+ * no marketplace subscription and no registration with the service is needed (SOS is never paywalled). */
+router.get('/me/emergency/options', A.requirePatient, ah(async (req, res) => {
+  const q = query(req, { lat: t.lat({ required: true }), lng: t.lng({ required: true }) });
+  if (!inNigeria(q.lat, q.lng)) throw bad('Your location looks outside Nigeria. Call 112.');
+  const here = { lat: q.lat, lng: q.lng }; const radius = sosRadiusKm();
+  const links = await db.col('patient_links').find({ patientId: req.ctx.patient.id, status: { $ne: 'removed' } });
+  const linked = new Set(links.map(l => l.orgId));
+  const out = [];
+  for (const o of await db.col('orgs').find({ status: 'active', modules: 'ambulance' })) {
+    const units = await dispatchableUnits(o.id);
+    const orgKm = o.location && o.location.lat != null ? haversineKm(here, o.location) : null;
+    let nearest = null;
+    for (const u of units) { const km = u.lastLoc && u.lastLoc.lat != null ? haversineKm(here, u.lastLoc) : orgKm; if (km != null && (nearest == null || km < nearest)) nearest = km; }
+    const km = nearest != null ? nearest : orgKm;
+    if (km == null || km > radius) continue;
+    out.push({ id: o.id, name: o.name, type: o.type, phone: (o.contact || {}).phone || null, availableUnits: units.length, distanceKm: round1(km),
+      etaMinutes: nearest != null ? etaMinutes(nearest) : null, registered: linked.has(o.id) });
+  }
+  out.sort((a, b) => (b.availableUnits > 0) - (a.availableUnits > 0) || a.distanceKm - b.distanceKm);
+  res.json({ options: out.slice(0, 12), choose: S.get('process.emergency.patientChoosesService', true) !== false, bookingFeeKobo: Number(S.get('process.emergency.bookingFeeKobo', 0)) || 0, radiusKm: radius });
 }));
 router.get('/me/emergency/active', A.requirePatient, ah(async (req, res) => {
   const inc = await db.col('incidents').findOne({ patientId: req.ctx.patient.id, status: { $in: OPEN } }, { sort: { createdAt: -1 } });
@@ -873,4 +907,4 @@ async function createIncidentFromUssd({ patient, phone, landmark, approxLocation
   return createIncident({ org: route.org, source: 'ussd', caller: { name: patient.firstName + ' ' + patient.lastName, phone: phone || patient.phone || null }, patient, location: loc, category: 'other',
     verified: false, note: 'USSD request. Location is approximate: call the patient back to confirm. Landmark: ' + String(landmark || '').slice(0, 150), createdBy: 'ussd', noUnitAvailable: route.noUnitAvailable });
 }
-module.exports = { name: 'ambulance', router, seedDemo, CATEGORIES, TRANSITIONS, routeProvider, readiness, createIncidentFromUssd };
+module.exports = { name: 'ambulance', router, seedDemo, CATEGORIES, TRANSITIONS, routeProvider, readiness, createIncidentFromUssd, createIncident };

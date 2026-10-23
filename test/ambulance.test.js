@@ -185,13 +185,43 @@ test('full case: assign, crew GPS, destination pre-alert, transport, close once,
   assert.equal((await disp.post('/api/dispatch/incidents/' + incId + '/close', {})).status, 409);
   const bills = await h.db.col('bills').find({ 'source.type': 'incident', 'source.id': incId });
   assert.equal(bills.length, 1, 'exactly one bill');
-  assert.deepEqual(bills[0].lines.map(l => l.code), ['AMB-ALS', 'AMB-KM']);
+  assert.deepEqual(bills[0].lines.map(l => l.code), ['AMB-ALS', 'AMB-KM', 'MC-EMERG']);
+  assert.equal(bills[0].lines[2].unitPriceKobo, 150000); assert.equal(bills[0].lines[2].platform, true);
   assert.equal(bills[0].orgId, h.ctx.orgs.ambulance.id);
   const fin = (await kunle.get('/api/me/emergency/' + incId)).body;
   assert.equal(fin.status, 'closed'); assert.deepEqual(fin.timeline.map(x => x.status), ['new', 'assigned', 'enroute', 'onscene', 'transporting', 'athospital', 'closed']);
   assert.equal((await kunle.get('/api/me/emergency/active')).body.incident, null);
   assert.equal(byName(await units(disp), 'SwiftAid 1').availability, 'available');
   assert.equal((await fd.get('/api/fd/incoming')).body.filter(i => i.incidentId === incId).length, 0);
+});
+
+test('SOS is open to any patient: any service nearby, no subscription, no prior registration, always billed', async () => {
+  const ngozi = await h.as('patient', 'ngozi@patient.demo');
+  const pid = (await h.db.col('users').findOne({ email: 'ngozi@patient.demo' })).patientId;
+  await h.db.col('patient_links').deleteMany({ patientId: pid, orgId: h.ctx.orgs.ambulance.id });
+  await h.db.col('market_subs').deleteMany({ patientId: pid });
+  // options list every ambulance service near her, any institute, free ones first
+  const opt = await ngozi.get('/api/me/emergency/options?lat=6.5966&lng=3.3421');
+  assert.equal(opt.status, 200); assert.equal(opt.body.choose, true); assert.equal(opt.body.bookingFeeKobo, 150000);
+  const sw = opt.body.options.find(o => o.name === 'SwiftAid Ambulance');
+  assert.ok(sw && sw.availableUnits >= 1 && sw.registered === false);
+  assert.equal((await ngozi.get('/api/me/emergency/options?lat=51.5&lng=-0.1')).status, 400);
+  // the service set no prices: the HQ fallback tariff still bills the trip
+  await h.db.col('services').updateMany({ orgId: h.ctx.orgs.ambulance.id, category: 'ambulance' }, { $set: { active: false } });
+  const sos = await ngozi.post('/api/me/emergency', { lat: 6.5966, lng: 3.3421, category: 'bleeding', providerOrgId: h.ctx.orgs.ambulance.id });
+  assert.equal(sos.status, 200); assert.equal(sos.body.provider.name, 'SwiftAid Ambulance');
+  const link = await h.db.col('patient_links').findOne({ patientId: pid, orgId: h.ctx.orgs.ambulance.id });
+  assert.equal(link.via, 'emergency', 'added to the service by the SOS itself');
+  const unit = (await disp.get('/api/dispatch/incidents/' + sos.body.id + '/suggest')).body[0];
+  await disp.post('/api/dispatch/incidents/' + sos.body.id + '/assign', { unitId: unit.id });
+  for (const st of ['enroute', 'onscene']) assert.equal((await crew.post('/api/crew/incidents/' + sos.body.id + '/status', { status: st })).status, 200);
+  await disp.post('/api/dispatch/incidents/' + sos.body.id + '/destination', { orgId: h.ctx.orgs.hospital.id });
+  for (const st of ['transporting', 'athospital', 'clear']) assert.equal((await crew.post('/api/crew/incidents/' + sos.body.id + '/status', { status: st })).status, 200);
+  const bill = await h.db.col('bills').findOne({ 'source.type': 'incident', 'source.id': sos.body.id });
+  assert.ok(bill, 'billed even without a price list'); assert.equal(bill.patientId, pid); assert.equal(bill.orgId, h.ctx.orgs.ambulance.id);
+  assert.equal(bill.lines[0].unitPriceKobo, unit.type === 'ALS' ? 5500000 : 3000000);
+  assert.ok(bill.lines.some(l => l.code === 'MC-EMERG'));
+  await h.db.col('services').updateMany({ orgId: h.ctx.orgs.ambulance.id, category: 'ambulance' }, { $set: { active: true } });
 });
 
 test('response metrics for admins', async () => {

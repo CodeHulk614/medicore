@@ -406,7 +406,7 @@ async function anonymisePatient(patientId, reason, requestId) {
   if (!p) throw notFound('Patient not found');
   await db.col('patients').updateOne({ id: p.id }, {
     $set: { firstName: 'Removed', lastName: 'Patient', email: null, address: null, homeLoc: null, nokName: null, nokPhone: null, status: 'removed', anonymisedAt: now(), retention: { reason, requestId, at: now(), note: 'Identity removed on request. Clinical, billing and audit records are retained under this id for legal and medical record retention.' } },
-    $unset: { phone: '', ussdPinHash: '' } });
+    $unset: { phone: '', ussdPinHash: '', ninHash: '', ninLast4: '' } });
   let userAction = null;
   if (p.userId) {
     const u = await db.col('users').findOne({ id: p.userId });

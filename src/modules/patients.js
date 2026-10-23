@@ -38,6 +38,8 @@ const formulary = require('../clinical/formulary');
 const S = require('../lib/settings');
 
 db.index('patients', ['phone'], { unique: true, sparse: true });
+db.index('patients', ['ninHash'], { unique: true, sparse: true });
+db.index('patients', ['uid'], { unique: true, sparse: true });
 db.index('patient_links', ['patientId', 'orgId'], { unique: true });
 db.index('patient_links', ['orgId', 'mrn'], { unique: true });
 db.index('patient_links', ['orgId', 'createdAt']);
@@ -101,11 +103,15 @@ async function sharesWith(orgId, patientId) {
   if (!crossSharingAllowed(org)) return false;
   const l = await linkOf(orgId, patientId); return !!(l && l.shareHistory);
 }
-/** Mongo-style filter for clinical records of a patient that the caller's org may see (own group always) */
+/** Mongo-style filter for clinical records of a patient that the caller's org may see (own group always, plus the
+ *  providers in an active shared-care arrangement for this patient) */
 async function visibleRecordFilter(req, patientId, orgField = 'orgId') {
   if (await sharesWith(req.ctx.org.id, patientId)) return { patientId };
   const ids = await groupOrgIds(req.ctx.org);
-  return ids.length > 1 ? { patientId, [orgField]: { $in: ids } } : { patientId, [orgField]: req.ctx.org.id };
+  let shared = [];
+  try { shared = await require('./caresharing').sharedOrgIds(ids, patientId); } catch (e) { shared = []; }
+  const all = [...new Set(ids.concat(shared))];
+  return all.length > 1 ? { patientId, [orgField]: { $in: all } } : { patientId, [orgField]: req.ctx.org.id };
 }
 
 /* ---------------- patient scope (provider mode) ---------------- */
@@ -155,7 +161,10 @@ async function scopeFilter(req, field = 'orgId') {
 async function patientCanUse(req, orgId) {
   if (patientMode() === 'open') return true;
   const provs = await patientProviders(req.ctx.patient.id);
-  return provs.some(p => p.orgIds.includes(orgId));
+  if (provs.some(p => p.orgIds.includes(orgId))) return true;
+  // the marketplace: subscribers use any listed provider, HMO members their HMO's network
+  const org = await db.col('orgs').findOne({ id: orgId });
+  return require('./market').canUseViaMarket(req.ctx.patient.id, org);
 }
 const age = dob => { if (!dob) return null; const d = new Date(dob + 'T00:00:00Z'); const n = new Date(); let a = n.getUTCFullYear() - d.getUTCFullYear(); if (n.getUTCMonth() < d.getUTCMonth() || (n.getUTCMonth() === d.getUTCMonth() && n.getUTCDate() < d.getUTCDate())) a--; return a; };
 /** what staff see: demographics + safety info, never the login */
@@ -163,9 +172,9 @@ function staffView(p, link) {
   return { id: p.id, mrn: link ? link.mrn : null, firstName: p.firstName, lastName: p.lastName, name: p.firstName + ' ' + p.lastName, dob: p.dob || null, age: age(p.dob), sex: p.sex || null,
     phone: p.phone || null, email: p.email || null, address: p.address || null, homeLoc: p.homeLoc || null, bloodGroup: p.bloodGroup || null, genotype: p.genotype || null,
     allergies: p.allergies || [], noKnownAllergies: !!p.noKnownAllergies, conditions: p.conditions || [], weightKg: p.weightKg || null, nokName: p.nokName || null, nokPhone: p.nokPhone || null,
-    lang: p.lang || 'en', whatsappOptIn: !!p.whatsappOptIn, whatsapp: p.whatsapp || null, whatsappOptInAt: p.whatsappOptInAt || null, claimed: !!p.userId, shareHistory: link ? !!link.shareHistory : false, linkedAt: link ? link.createdAt : null };
+    lang: p.lang || 'en', uid: p.uid || null, ninLast4: p.ninLast4 || null, ninStatus: ninView(p).ninStatus, noNinReason: p.noNinReason || null, whatsappOptIn: !!p.whatsappOptIn, whatsapp: p.whatsapp || null, whatsappOptInAt: p.whatsappOptInAt || null, claimed: !!p.userId, shareHistory: link ? !!link.shareHistory : false, linkedAt: link ? link.createdAt : null };
 }
-function selfView(p) { const v = staffView(p, null); delete v.mrn; delete v.shareHistory; delete v.linkedAt; v.ussdPinSet = !!p.ussdPinHash; v.consent = p.consent || null; v.whatsapp = p.whatsapp || null; v.whatsappOptIn = !!p.whatsappOptIn; return v; }
+function selfView(p) { const v = Object.assign(staffView(p, null), ninView(p)); delete v.mrn; delete v.shareHistory; delete v.linkedAt; v.ussdPinSet = !!p.ussdPinHash; v.consent = p.consent || null; v.whatsapp = p.whatsapp || null; v.whatsappOptIn = !!p.whatsappOptIn; return v; }
 async function patientName(patientId) { const p = await db.col('patients').findOne({ id: patientId }, { projection: { firstName: 1, lastName: 1 } }); return p ? p.firstName + ' ' + p.lastName : 'Patient'; }
 
 const allergyRule = t.obj({ substance: t.str({ required: true, max: 80 }), reaction: t.str({ max: 120 }), severity: t.enum(['mild', 'moderate', 'severe', 'unknown']) });
@@ -187,6 +196,50 @@ async function recordConsent(patientId, channel, accepted) {
   await db.col('patients').updateOne({ id: patientId }, { $set: { consent: { version: c.version, accepted: c.accepted, at: c.at, channel } } });
 }
 
+/* ---------------- NIN (lib/identity.js) ----------------
+ * Every patient is registered with a NIN before a provider onboards them. The NIN itself is never stored. */
+const ID = require('../lib/identity');
+/* one person, one record: every patient has a MediCore patient ID (MCP-XXXX-XXXX) for life, used by every provider and
+ * HMO they deal with. Duplicates are refused on NIN, then phone, then email. */
+const UID_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newUid() { const b = require('crypto').randomBytes(8); const c = Array.from(b).map(x => UID_ALPHA[x % 32]).join(''); return 'MCP-' + c.slice(0, 4) + '-' + c.slice(4); }
+async function ensureUid(p) { if (!p || p.uid) return p; for (let i = 0; i < 5; i++) { const uid = newUid(); try { await db.col('patients').updateOne({ id: p.id, uid: { $exists: false } }, { $set: { uid } }); const f = await db.col('patients').findOne({ id: p.id }); if (f && f.uid) { p.uid = f.uid; return p; } } catch (e) { if (e.code !== 11000) throw e; } } return p; }
+async function emailTaken(email, exceptPatientId) { if (!email) return false; const o = await db.col('patients').findOne({ email: String(email).toLowerCase() }); return !!(o && o.id !== exceptPatientId); }
+const coded = (status, msg, code) => Object.assign(bad(msg), { status, code });
+const ninRule = t.str({ pattern: /^\d{11}$/, label: 'NIN (11 digits)' });
+const NO_NIN_REASONS = ['child', 'emergency', 'not_enrolled', 'foreign_national'];
+const requireNin = org => S.get('process.identity.requireNin', true, org) !== false;
+/** check a NIN for a person and make sure no other record has it. Returns the fields to save on the patient. */
+async function ninFields(nin, who, exceptPatientId) {
+  const r = await ID.verify(nin, who, { matchDob: S.get('process.identity.matchDob', true) !== false });
+  if (r.ninStatus === 'invalid') throw bad('A NIN has 11 digits. Check the number on the NIN slip or the NIMC app.', { field: 'nin' });
+  if (r.ninStatus === 'not_found') throw bad('NIMC has no record of that NIN. Check the 11 digits and try again.', { field: 'nin' });
+  if (r.ninStatus === 'mismatch') throw bad('The name or date of birth does not match the NIN record. Use the name exactly as it is on the NIN slip.', { field: 'nin' });
+  const other = await db.col('patients').findOne({ ninHash: r.ninHash });
+  if (other && other.id !== exceptPatientId) throw conflict('This NIN already has a MediCore record. Sign in with that account, or ask the provider to find the patient by NIN.', 'nin_exists');
+  return { ninHash: r.ninHash, ninLast4: r.ninLast4, ninStatus: r.ninStatus, ninCheckedAt: r.ninCheckedAt, ninProvider: r.ninProvider, noNinReason: null };
+}
+const ninView = p => ({ ninLast4: p.ninLast4 || null, ninStatus: p.ninHash ? (p.ninStatus || 'pending') : (p.noNinReason ? 'none_with_reason' : 'missing'), noNinReason: p.noNinReason || null });
+/** the HMO cover a patient holds, as another provider sees it. Before consent only the HMO and whether you are in its network. */
+async function hmoSummary(patientId, org, full) {
+  const covs = await db.col('coverages').find({ patientId, status: { $in: ['active', 'pending', 'suspended'] } });
+  const out = [];
+  for (const c of covs) {
+    const h = await db.col('orgs').findOne({ id: c.payerOrgId }, { projection: { name: 1 } });
+    const inNet = !!(await db.col('hmo_network').findOne({ payerOrgId: c.payerOrgId, orgId: org.id, status: 'active' })) || !!(await db.col('hmo_panel').findOne({ orgId: org.id, payerOrgId: c.payerOrgId, active: { $ne: false } }));
+    const v = { hmoName: h ? h.name : 'HMO', status: c.status, inNetworkHere: inNet };
+    if (full) {
+      const prim = c.primaryOrgId ? await db.col('orgs').findOne({ id: c.primaryOrgId }, { projection: { name: 1 } }) : null;
+      const netCount = await db.col('hmo_network').count({ payerOrgId: c.payerOrgId, status: 'active' });
+      const deps = await db.col('coverages').count({ principalCoverageId: c.id, status: { $in: ['active', 'pending'] } });
+      const claims = await db.col('claims').count({ coverageId: c.id });
+      Object.assign(v, { coverageId: c.id, planName: c.planName || null, memberNo: c.memberNo, relation: c.relation || 'self', validTo: c.validTo || null, primaryProvider: prim ? prim.name : null, isPrimaryHere: c.primaryOrgId === org.id, networkProviders: netCount, dependants: deps, claimsSoFar: claims, enrolledBy: c.enrolledBy || null });
+    }
+    out.push(v);
+  }
+  return out;
+}
+
 /* ================= patient self-service ================= */
 router.post('/patients/register/start', ah(async (req, res) => {
   const b = body(req, { phone: t.phone({ required: true }) });
@@ -202,9 +255,10 @@ router.post('/patients/register', ah(async (req, res) => {
   const b = body(req, Object.assign({}, demographics, {
     phone: t.phone({ required: true }), code: t.str({ required: true, max: 6, label: 'SMS code' }),
     password: t.str({ required: true, trim: false, max: 128 }), consent: t.bool({ required: true }),
-    allergies: t.arr(allergyRule, { max: 20 }), noKnownAllergies: t.bool(),
+    allergies: t.arr(allergyRule, { max: 20 }), noKnownAllergies: t.bool(), nin: ninRule,
   }));
   if (!b.consent) throw bad('Please accept the privacy notice to create an account');
+  if (!b.nin && requireNin()) throw bad('Type your NIN (11 digits). It confirms who you are, so providers and HMOs can register you without paperwork.', { field: 'nin' });
   A.checkPassword(b.password);
   await otp.verify('signup', b.phone, b.code);
   let user = await db.col('users').findOne({ phone: b.phone });
@@ -214,12 +268,15 @@ router.post('/patients/register', ah(async (req, res) => {
   // claim a record a provider created earlier for this phone, or make a new one
   let patient = await db.col('patients').findOne({ phone: b.phone });
   const fields = { firstName: b.firstName, lastName: b.lastName, dob: b.dob || null, sex: b.sex || 'unknown', email: b.email || null, address: b.address || null, homeLoc: b.homeLoc || null, lang: b.lang || 'en' };
+  const nf = b.nin ? await ninFields(b.nin, { firstName: b.firstName, lastName: b.lastName, dob: b.dob }, patient ? patient.id : null) : null;
+  if (b.email && await emailTaken(b.email, patient ? patient.id : null)) throw conflict('This email already belongs to a MediCore patient. Sign in with that account instead.', 'email_exists');
+  if (nf && patient && patient.ninHash && patient.ninHash !== nf.ninHash) throw conflict('The NIN does not match the record a provider made for this phone number. Ask the provider to check it.', 'nin_mismatch');
   if (patient) {
     const set = {}; Object.entries(fields).forEach(([k, v]) => { if (v != null && !patient[k]) set[k] = v; });
     if (b.allergies && b.allergies.length) set.allergies = (patient.allergies || []).concat(normAllergies(b.allergies, 'patient'));
-    await db.col('patients').updateOne({ id: patient.id }, { $set: Object.assign(set, { phoneVerified: true }) });
+    await db.col('patients').updateOne({ id: patient.id }, { $set: Object.assign(set, { phoneVerified: true }, nf || {}) });
   } else {
-    patient = Object.assign({ id: id('pat'), phone: b.phone, phoneVerified: true, status: 'active', createdAt: now(), createdVia: 'self', allergies: normAllergies(b.allergies, 'patient'), noKnownAllergies: !!b.noKnownAllergies, conditions: [] }, fields);
+    patient = Object.assign({ id: id('pat'), uid: newUid(), phone: b.phone, phoneVerified: true, status: 'active', createdAt: now(), createdVia: 'self', allergies: normAllergies(b.allergies, 'patient'), noKnownAllergies: !!b.noKnownAllergies, conditions: [] }, fields, nf || {});
     await db.col('patients').insertOne(patient);
   }
   if (user) {
@@ -237,13 +294,14 @@ router.post('/patients/register', ah(async (req, res) => {
   res.json({ ok: true, patientId: patient.id });
 }));
 
-router.get('/me/profile', A.requirePatient, ah(async (req, res) => { res.json(selfView(req.ctx.patient)); }));
+router.get('/me/profile', A.requirePatient, ah(async (req, res) => { res.json(selfView(await ensureUid(req.ctx.patient))); }));
 router.patch('/me/profile', A.requirePatient, ah(async (req, res) => {
   const rules = Object.assign({}, demographics); rules.firstName = t.str({ max: 60, plain: true }); rules.lastName = t.str({ max: 60, plain: true });
   const b = body(req, Object.assign(rules, { addAllergies: t.arr(allergyRule, { max: 10 }), noKnownAllergies: t.bool() }));
   const upd = { $set: {} };
   for (const k of Object.keys(demographics)) if (b[k] !== undefined) upd.$set[k] = b[k];
   if (b.noKnownAllergies !== undefined) upd.$set.noKnownAllergies = b.noKnownAllergies;
+  if (b.email && await emailTaken(b.email, req.ctx.patient.id)) throw conflict('That email already belongs to another MediCore patient', 'email_exists');
   if (b.email) { const e = await db.col('users').findOne({ email: b.email }); if (e && e.id !== req.ctx.user.id) throw conflict('That email is already used by another account'); await db.col('users').updateOne({ id: req.ctx.user.id }, { $set: { email: b.email } }); }
   if (b.addAllergies && b.addAllergies.length) upd.$push = { allergies: { $each: normAllergies(b.addAllergies, 'patient') } };
   if (!Object.keys(upd.$set).length) delete upd.$set;
@@ -253,6 +311,17 @@ router.patch('/me/profile', A.requirePatient, ah(async (req, res) => {
   res.json(selfView(p));
 }));
 
+/* add or replace the NIN on an existing account (needed before applying to a provider or buying an HMO plan) */
+router.post('/me/nin', A.requirePatient, ah(async (req, res) => {
+  const b = body(req, { nin: t.str({ required: true, pattern: /^\d{11}$/, label: 'NIN (11 digits)' }) });
+  await RL.limit('nin_' + req.ctx.patient.id, 6, 3600, 'Too many NIN checks. Try again in an hour.');
+  const p = req.ctx.patient;
+  if (p.ninHash && p.ninStatus === 'verified') throw conflict('Your NIN is already confirmed. Ask a provider if it needs correcting.', 'nin_set');
+  const nf = await ninFields(b.nin, { firstName: p.firstName, lastName: p.lastName, dob: p.dob }, p.id);
+  const up = await db.col('patients').findOneAndUpdate({ id: p.id }, { $set: nf });
+  await audit(req, 'patient.nin', { type: 'patient', id: p.id, patientId: p.id, orgId: null }, { status: nf.ninStatus });
+  res.json(selfView(up));
+}));
 /* providers this patient is linked to, and the sharing switch for each */
 router.get('/me/providers', A.requirePatient, ah(async (req, res) => {
   const links = await db.col('patient_links').find({ patientId: req.ctx.patient.id, status: { $ne: 'removed' } });
@@ -330,6 +399,21 @@ async function applyTo(req, org, note) {
   const dup = await db.col('patient_applications').findOne({ patientId: pid, status: 'pending', $or: [{ orgId: org.id }].concat(org.groupId ? [{ groupId: org.groupId }] : []) });
   if (dup) throw conflict('You already have an application waiting with this provider', 'application_pending');
   await RL.limit('papply_' + pid, 10, 86400);
+  // a NIN on file first: it is what lets the provider onboard the patient without paperwork
+  if (requireNin(org) && !req.ctx.patient.ninHash) throw coded(400, 'Add your NIN in Settings first. Providers onboard patients with a confirmed NIN.', 'nin_required');
+  const M = require('./market');
+  const viaMarket = await M.canUseViaMarket(pid, org);
+  // the first provider is free; joining more needs the marketplace subscription (HMO members: their HMO's network is free)
+  if (!viaMarket && S.get('process.patients.freeFirstProvider', true) !== false && S.feature('marketplace')) {
+    const pend = await db.col('patient_applications').count({ patientId: pid, status: 'pending' });
+    if (provs.length || pend) throw coded(403, 'Your first provider is free. To join more hospitals, pharmacies and labs, subscribe to the marketplace.', 'subscription_required');
+  }
+  // a marketplace subscriber (or an HMO member joining a network provider) is registered at once unless the provider approves joiners
+  if (M.autoRegister(org) && viaMarket) {
+    const l = await ensureLink(org.id, pid, req.ctx.user.id, 'marketplace');
+    await audit(req, 'market.join', { type: 'link', id: l.id, patientId: pid, orgId: org.id });
+    return { ok: true, approved: true, mrn: l.mrn, application: { id: null, orgId: org.id, orgName: org.name, status: 'approved' } };
+  }
   const n = await nextNumber('papp');
   const days = Number(S.get('process.patients.applicationExpiryDays', 30, org)) || 30;
   const a = { id: id('pa'), number: 'PA' + String(n).padStart(6, '0'), patientId: pid, orgId: org.id, groupId: org.groupId || null, status: 'pending', note: note || null, createdAt: now(), expiresAt: now() + days * 86400e3 };
@@ -386,12 +470,12 @@ router.get('/join/providers', ah(async (req, res) => {
 }));
 
 /* NDPA rights: export everything, ask for deletion or correction */
-const PATIENT_COLLECTIONS = ['appointments', 'encounters', 'prescriptions', 'rx_orders', 'deliveries', 'lab_orders', 'bills', 'payments', 'coverages', 'preauths', 'claims', 'incidents', 'messages', 'chw_visits', 'vitals', 'consents', 'notifications'];
+const PATIENT_COLLECTIONS = ['appointments', 'encounters', 'prescriptions', 'rx_orders', 'deliveries', 'lab_orders', 'bills', 'payments', 'coverages', 'preauths', 'claims', 'incidents', 'messages', 'chw_visits', 'vitals', 'consents', 'notifications', 'documents', 'care_shares', 'market_subs', 'hmo_requests', 'transfers'];
 router.get('/me/export', A.requirePatient, ah(async (req, res) => {
   await RL.limit('export_' + req.ctx.patient.id, 5, 3600);
   const pid = req.ctx.patient.id;
   const out = { exportedAt: new Date().toISOString(), format: 'MediCore patient export v1', profile: selfView(req.ctx.patient), providers: await db.col('patient_links').find({ patientId: pid }) };
-  for (const c of PATIENT_COLLECTIONS) out[c] = await db.col(c).find({ patientId: pid }, { projection: { codeHash: 0, pickupCodeHash: 0, deliveryCodeHash: 0 } });
+  for (const c of PATIENT_COLLECTIONS) out[c] = await db.col(c).find({ patientId: pid }, { projection: { codeHash: 0, pickupCodeHash: 0, deliveryCodeHash: 0, packHash: 0, packCodeHash: 0 } });
   await audit(req, 'patient.export', { type: 'patient', id: pid, patientId: pid, orgId: null });
   res.setHeader('Content-Disposition', 'attachment; filename="medicore-my-data.json"');
   res.json(out);
@@ -422,35 +506,50 @@ router.post('/me/notifications/read', A.requirePatient, ah(async (req, res) => {
 /* ================= front desk: register / link / search ================= */
 const fd = perm => A.requireStaff({ perm });
 
+/* find a patient by phone or NIN. A record held by other providers (or created by an HMO) is opened only with the
+ * patient's code; before that the desk sees which HMO covers them and whether this provider is in its network. */
+async function findPatient(b) {
+  if (b.nin) return db.col('patients').findOne({ ninHash: ID.ninHash(b.nin) });
+  if (b.uid) return db.col('patients').findOne({ uid: String(b.uid).toUpperCase().trim() });
+  if (b.email) return db.col('patients').findOne({ email: String(b.email).toLowerCase() });
+  return db.col('patients').findOne({ phone: b.phone });
+}
 router.post('/fd/patients/lookup', fd('patient.register'), ah(async (req, res) => {
-  const b = body(req, { phone: t.phone({ required: true }) });
+  const b = body(req, { phone: t.phone(), nin: ninRule, uid: t.str({ max: 16, pattern: /^MCP-[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$/i, label: 'MediCore patient ID' }), email: t.email() });
+  if (!b.phone && !b.nin && !b.uid && !b.email) throw bad('Type the patient\'s NIN, MediCore patient ID, phone number or email');
   await RL.limit('fdlookup_' + req.ctx.user.id, 60, 3600);
-  const p = await db.col('patients').findOne({ phone: b.phone });
+  const p = await findPatient(b);
   if (!p) return res.json({ status: 'new' });
   const l = await linkOf(req.ctx.org.id, p.id);
-  if (l) { await audit(req, 'patient.view', { type: 'patient', id: p.id, patientId: p.id }); return res.json({ status: 'linked', patient: staffView(p, l) }); }
-  // exists on MediCore but not with this provider: the desk sees nothing until the patient consents
-  const extra = await otp.issue('link:' + req.ctx.org.id, b.phone, req.ctx.org.name + ' wants to open your MediCore record. Give them this code only if you agree: {code}');
+  if (l) { await audit(req, 'patient.view', { type: 'patient', id: p.id, patientId: p.id }); return res.json({ status: 'linked', patient: staffView(p, l), hmo: await hmoSummary(p.id, req.ctx.org, true) }); }
+  const hmo = S.get('process.identity.showHmoBeforeConsent', true) !== false ? await hmoSummary(p.id, req.ctx.org, false) : [];
+  if (!p.phone) { await audit(req, 'patient.link_requested', { type: 'patient', id: p.id, patientId: p.id }, { noPhone: true }); return res.json({ status: 'exists_no_phone', hmo, message: 'This person has a MediCore record without a phone number (often a dependant). Register them with their HMO card code, or ask the principal member to share access.' }); }
+  // exists on MediCore but not with this provider: the desk sees nothing clinical until the patient consents
+  const extra = await otp.issue('link:' + req.ctx.org.id, p.phone, req.ctx.org.name + ' wants to open your MediCore record. Give them this code only if you agree: {code}');
   await audit(req, 'patient.link_requested', { type: 'patient', id: p.id, patientId: p.id });
-  res.json(Object.assign({ status: 'exists_elsewhere', message: 'This person already has a MediCore record. We have sent them a code by SMS. Ask them for it to link their record to your provider.' }, extra));
+  res.json(Object.assign({ status: 'exists_elsewhere', hmo, phoneHint: maskPhone(p.phone), message: 'This person already has a MediCore record. We have sent them a code by SMS. Ask them for it to link their record to your provider.' }, extra));
 }));
 router.post('/fd/patients/link', fd('patient.register'), ah(async (req, res) => {
-  const b = body(req, { phone: t.phone({ required: true }), code: t.str({ required: true, max: 6 }) });
-  const p = await db.col('patients').findOne({ phone: b.phone });
-  if (!p) throw notFound('Patient not found');
-  await otp.verify('link:' + req.ctx.org.id, b.phone, b.code);
+  const b = body(req, { phone: t.phone(), nin: ninRule, uid: t.str({ max: 16 }), email: t.email(), code: t.str({ required: true, max: 6 }) });
+  const p = await findPatient(b);
+  if (!p || !p.phone) throw notFound('Patient not found');
+  await otp.verify('link:' + req.ctx.org.id, p.phone, b.code);
   const l = await ensureLink(req.ctx.org.id, p.id, req.ctx.user.id, 'consent_code');
   await audit(req, 'patient.linked', { type: 'patient', id: p.id, patientId: p.id });
   if (p.userId) await notify({ patientId: p.id, title: 'Linked to ' + req.ctx.org.name, body: 'You can choose whether they see your records from other providers in Settings.', kind: 'link' });
-  res.json({ ok: true, patient: staffView(p, l) });
+  res.json({ ok: true, patient: staffView(p, l), hmo: await hmoSummary(p.id, req.ctx.org, true) });
 }));
 router.post('/fd/patients', fd('patient.register'), ah(async (req, res) => {
-  const b = body(req, Object.assign({}, demographics, { phone: t.phone({ label: 'Phone' }), allergies: t.arr(allergyRule, { max: 20 }), noKnownAllergies: t.bool(), consent: t.bool({ required: true }) }));
+  const b = body(req, Object.assign({}, demographics, { phone: t.phone({ label: 'Phone' }), allergies: t.arr(allergyRule, { max: 20 }), noKnownAllergies: t.bool(), consent: t.bool({ required: true }), nin: ninRule, noNinReason: t.enum(NO_NIN_REASONS) }));
   if (!b.consent) throw bad('The patient must agree to the privacy notice before registration');
   if (b.phone) { const ex = await db.col('patients').findOne({ phone: b.phone }); if (ex) throw conflict('This phone number already has a MediCore record. Use "Find patient" to link it with the patient\'s code.', 'patient_exists'); }
-  const p = { id: id('pat'), firstName: b.firstName, lastName: b.lastName, dob: b.dob || null, sex: b.sex || 'unknown', phone: b.phone || undefined, email: b.email || null, address: b.address || null, homeLoc: b.homeLoc || null,
+  if (b.email && await emailTaken(b.email, null)) throw conflict('This email already has a MediCore record. Use "Find patient" to link it with the patient\'s code.', 'patient_exists');
+  if (!b.nin && requireNin(req.ctx.org) && !(b.noNinReason && S.get('process.identity.allowNoNinWithReason', true) !== false)) throw bad('Type the patient\'s NIN (11 digits), or choose why they have none.', { field: 'nin' });
+  const nf = b.nin ? await ninFields(b.nin, { firstName: b.firstName, lastName: b.lastName, dob: b.dob }, null) : { noNinReason: b.noNinReason || null };
+  const p = { id: id('pat'), uid: newUid(), firstName: b.firstName, lastName: b.lastName, dob: b.dob || null, sex: b.sex || 'unknown', phone: b.phone || undefined, email: b.email || null, address: b.address || null, homeLoc: b.homeLoc || null,
     bloodGroup: b.bloodGroup || null, genotype: b.genotype || null, weightKg: b.weightKg || null, nokName: b.nokName || null, nokPhone: b.nokPhone || null,
     allergies: normAllergies(b.allergies, 'staff'), noKnownAllergies: !!b.noKnownAllergies, conditions: [], status: 'active', createdAt: now(), createdVia: 'provider', createdByOrg: req.ctx.org.id, userId: null };
+  Object.assign(p, nf);
   if (!p.phone) delete p.phone;
   await db.col('patients').insertOne(p);
   const l = await ensureLink(req.ctx.org.id, p.id, req.ctx.user.id, 'registered');
@@ -510,7 +609,14 @@ router.get('/fd/patients', A.requireStaff({ perm: 'patient.read' }), ah(async (r
   }
   res.json(ps.slice(0, q.limit || 50).map(p => staffView(p, byId[p.id])));
 }));
+/* the HMO cover of one of our patients: plan, validity, primary provider, network size, dependants, claims */
+router.get('/fd/patients/:id/hmo-summary', A.requireStaff({ perm: 'patient.read' }), ah(async (req, res) => {
+  const l = await linkOf(req.ctx.org.id, param(req, 'id'));
+  if (!l) throw notFound('Patient not found');
+  res.json(await hmoSummary(l.patientId, req.ctx.org, true));
+}));
 router.get('/fd/patients/:id', A.requireStaff({ perm: 'patient.read' }), ah(async (req, res) => {
+  await ensureUid(await db.col('patients').findOne({ id: param(req, 'id') }));
   const { patient, link } = await requireLinked(req, param(req, 'id'));
   await audit(req, 'patient.view', { type: 'patient', id: patient.id, patientId: patient.id });
   res.json(staffView(patient, link));
@@ -541,4 +647,4 @@ router.patch('/fd/patients/:id', A.requireStaff({ anyPerm: ['patient.register', 
   res.json(staffView(p, await linkOf(req.ctx.org.id, p.id)));
 }));
 
-module.exports = { name: 'patients', router, linkOf, requireLinked, ensureLink, sharesWith, visibleRecordFilter, groupOrgIds, patientMode, crossSharingAllowed, patientProviders, patientScope, scopeFilter, patientCanUse, applicationView, staffView, selfView, patientName, normAllergies, allergyRule, demographics, recordConsent, age, PATIENT_COLLECTIONS };
+module.exports = { name: 'patients', router, newUid, ensureUid, emailTaken, ninFields, ninView, hmoSummary, NO_NIN_REASONS, applyToOrg: (req, org, note) => applyTo(req, org, note), linkOf, requireLinked, ensureLink, sharesWith, visibleRecordFilter, groupOrgIds, patientMode, crossSharingAllowed, patientProviders, patientScope, scopeFilter, patientCanUse, applicationView, staffView, selfView, patientName, normAllergies, allergyRule, demographics, recordConsent, age, PATIENT_COLLECTIONS };

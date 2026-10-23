@@ -302,7 +302,7 @@
     const ok = await confirm({ title: T('patient.pay.q', 'Pay {amount}?', { amount }), body: orgName ? T('patient.pay.q_body', 'You are paying {amount} to {org}. You will get a receipt in the app.', { amount, org: orgName }) : T('patient.pay.q_body2', 'You are paying {amount}. You will get a receipt in the app.', { amount }), ok: T('patient.pay.ok', 'Pay {amount}', { amount }) });
     if (!ok) return false;
     const r = await api.post('/api/me/bills/' + encodeURIComponent(billId) + '/pay');
-    if (r.mode === 'paystack' && r.authorizationUrl) { store.set('payReturn', returnTo || location.hash); location.href = r.authorizationUrl; return 'redirect'; }
+    if (r.authorizationUrl) { store.set('payReturn', returnTo || location.hash); location.href = r.authorizationUrl; return 'redirect'; }
     if (r.mode === 'demo') {
       const go = await dialog({ title: T('patient.pay.demo_title', 'Demo payment'), body: html`<div class="notice warn">${T('patient.pay.demo_note', 'Demo mode: no card is charged. In the live app this is where you pay by card, bank transfer or USSD.')}</div><p>${T('patient.pay.demo_amount', 'Amount')}: <b>${money(r.amountKobo)}</b></p>`,
         actions: [{ label: T('kit.cancel', 'Cancel'), value: false }, { label: T('patient.pay.demo_ok', 'Complete payment'), value: true, primary: true }] });
@@ -336,17 +336,34 @@
   async function startSOS() {
     const act = await api.get('/api/me/emergency/active').catch(() => ({ incident: null }));
     if (act.incident) { MC.go('#/sos/' + act.incident.id); return; }
+    // location and the list of ambulance services are fetched while the dialog is open, so sending is never delayed
+    let posP = MC.position(10000);
     const d = await dialog({ title: T('patient.sos.q', 'Send an ambulance now?'), form: true,
       body: html`<p>${T('patient.sos.q_body', 'We will send your location to the nearest ambulance service. Press the red button to send.')}</p>
-        <div class="field"><label for="sos-cat">${T('patient.sos.what', 'What is happening? (optional)')}</label><select class="input" id="sos-cat" name="category">${SOS_CATS().map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></div>`,
+        <div class="field"><label for="sos-cat">${T('patient.sos.what', 'What is happening? (optional)')}</label><select class="input" id="sos-cat" name="category">${SOS_CATS().map(([k, l]) => html`<option value="${k}">${l}</option>`)}</select></div>
+        <div class="field"><label for="sos-prov">${T('patient.sos.which', 'Which ambulance?')}</label><select class="input" id="sos-prov" name="providerOrgId"><option value="">${T('patient.sos.nearest', 'Nearest free ambulance (fastest)')}</option></select>
+        <p class="xs muted" id="sos-prov-note" style="margin:6px 0 0">${T('patient.sos.loading_opts', 'Looking for ambulances near you...')}</p></div>
+        <p class="xs muted">${T('patient.sos.charge_note', 'Any ambulance service on MediCore can come, even one you are not registered with. No subscription is needed. The service bills your MediCore account for the trip after it ends.')}</p>`,
       actions: [{ label: T('kit.cancel', 'Cancel'), value: null }, { label: T('patient.sos.send', 'Send ambulance now'), primary: true }],
-      onOpen: dl => { const b = dl.querySelector('button[type=submit]'); if (b) { b.classList.remove('primary'); b.classList.add('danger'); } dl.querySelector('.dlg-foot button[type=submit]').focus(); } });
+      onOpen: dl => {
+        const b = dl.querySelector('button[type=submit]'); if (b) { b.classList.remove('primary'); b.classList.add('danger'); } dl.querySelector('.dlg-foot button[type=submit]').focus();
+        posP.then(async p => {
+          const note = dl.querySelector('#sos-prov-note'); const sel = dl.querySelector('#sos-prov'); if (!note || !sel) return;
+          if (!p) { note.textContent = T('patient.sos.opts_noloc', 'Location is off, so we will send the nearest service we can find.'); return; }
+          const r = await api.get('/api/me/emergency/options' + qs({ lat: p.lat.toFixed(5), lng: p.lng.toFixed(5) })).catch(() => null);
+          if (!r || !r.options.length) { note.textContent = T('patient.sos.opts_none', 'No ambulance service found near you on MediCore. Send anyway, and also call 112.'); return; }
+          if (r.choose) for (const o of r.options) { const op = document.createElement('option'); op.value = o.id; op.disabled = !o.availableUnits;
+            op.textContent = o.name + ' | ' + o.distanceKm + ' km | ' + (o.availableUnits ? T('patient.sos.opt_free', '{n} free', { n: o.availableUnits }) + (o.etaMinutes ? ', ' + T('patient.sos.opt_eta', 'about {n} min', { n: o.etaMinutes }) : '') : T('patient.sos.opt_busy', 'all busy')); sel.appendChild(op); }
+          const free = r.options.filter(o => o.availableUnits).length;
+          note.textContent = free ? T('patient.sos.opts_found', '{n} services with a free ambulance near you.', { n: free }) : T('patient.sos.opts_busy', 'Every service near you is busy. Send anyway: the first free ambulance will come. Also call 112.');
+        });
+      } });
     if (!d) return;
-    await sendSOS(d.category || 'other');
+    await sendSOS(d.category || 'other', d.providerOrgId || null, await posP);
   }
-  async function sendSOS(category) {
-    toast(T('patient.sos.locating', 'Finding your location...'));
-    let pos = await MC.position(10000); const extra = {};
+  async function sendSOS(category, providerOrgId, known) {
+    if (!known) toast(T('patient.sos.locating', 'Finding your location...'));
+    let pos = known || await MC.position(10000); const extra = {}; if (providerOrgId) extra.providerOrgId = providerOrgId;
     if (!pos) {
       const r = await dialog({ title: T('patient.sos.noloc', 'We could not find your location'), form: true,
         body: html`<p>${T('patient.sos.noloc_body', 'Location is off or not allowed. Tell us where you are so the ambulance can find you.')}</p>
@@ -377,7 +394,7 @@
     const [act, hist, cts] = await Promise.all([api.get('/api/me/emergency/active'), api.get('/api/me/emergency').catch(() => []), curContacts()]);
     if (stale()) return;
     if (act.incident) { location.replace('#/sos/' + act.incident.id); return; }
-    view(html`${head(T('patient.sos.title', 'Emergency'), T('patient.sos.sub', 'Get an ambulance to where you are.'))}
+    view(html`${head(T('patient.sos.title', 'Emergency'), T('patient.sos.sub', 'Get an ambulance to where you are.'))}${MC.feature('publicFacilities') ? html`<div class="btn-row" style="margin-top:0"><a class="btn" href="#/hospitals">${icon('building')}${T('patient.sos.hospitals', 'Hospitals near me')}</a></div>` : ''}
       <button class="sos" data-action="sos">${icon('sos')}<span>${T('patient.sos.btn', 'SOS')}<small>${T('patient.sos.btn_sub', 'Send an ambulance to me')}</small></span></button>
       ${emergencyNumbers()}
       ${cts ? provEmergency(cts) : ''}
@@ -468,7 +485,7 @@
         <div class="btn-row">${providers().length > 1 ? html`<button class="btn sm" data-action="prov-switch">${icon('swap')}${T('patient.prov.switch', 'Switch provider')}</button>` : ''}
           ${p.kind === 'group' ? html`<a class="btn sm" href="#/care?type=places">${icon('pin')}${T('patient.home.branches', 'Branches and phone numbers')}</a>` : phones.length && !ccard ? html`<a class="btn sm" href="tel:${phones[0].phone}">${icon('phone')}${T('patient.prov.call_name', 'Call {name}', { name: p.name })}</a>` : ''}</div></div></section>` : '';
     const tiles = isProv() ? [has('clinic') ? ['#/care', 'steth', T('patient.home.t_book', 'Book a doctor')] : null, has('clinic') || has('pharmacy') ? ['#/medicines', 'pill', T('patient.home.t_meds', 'My medicines')] : null,
-      has('lab') || has('clinic') ? ['#/results', 'flask', T('patient.home.t_results', 'My results')] : null, ['#/more/bills', 'card', T('patient.nav.bills', 'Bills and payments')], ['#/more/messages', 'message', T('patient.nav.messages', 'Messages')]].filter(Boolean)
+      has('lab') || has('clinic') ? ['#/results', 'flask', T('patient.home.t_results', 'My results')] : null, ['#/more/bills', 'card', T('patient.nav.bills', 'Bills and payments')], ['#/more/messages', 'message', T('patient.nav.messages', 'Messages')], MC.feature('marketplace') ? ['#/market', 'globe', T('patient.home.t_market', 'Find any provider')] : null].filter(Boolean)
       : [['#/care', 'steth', T('patient.home.t_book', 'Book a doctor')], ['#/medicines', 'pill', T('patient.home.t_meds', 'My medicines')], ['#/care?type=lab', 'flask', T('patient.home.t_lab', 'Find a lab')], ['#/care?type=pharmacy', 'box', T('patient.home.t_pharm', 'Find a pharmacy')]];
     const status = isProv() && (pendingApps().length || openRefs.length) ? html`<h2 class="sec">${T('patient.home.status', 'Applications and referrals')}</h2><div class="list">
         ${pendingApps().map(a => html`<a href="#/more/providers">${icon('clock')}<div class="grow"><span class="title">${T('patient.app.to', 'Application to {provider}', { provider: a.orgName || a.groupName || '' })}</span><span class="sub">${T('patient.app.waiting', 'Waiting for them to approve it')} | ${date(a.createdAt)}</span></div>${sb('pending', T('patient.app.st.pending', 'Waiting'))}</a>`)}
@@ -1197,6 +1214,7 @@
         ${c.status === 'active' && c.limits ? html`<h3 style="margin-top:16px">${T('patient.hmo.left', 'Cover left this year')}</h3>${Object.keys(c.limits).filter(k => c.limits[k] > 0).map(k => { const left = c.remainingKobo ? c.remainingKobo[k] : c.limits[k]; const pct = Math.max(0, Math.min(100, Math.round(left / c.limits[k] * 100))); return html`<div style="margin-bottom:10px"><div class="row between sm"><span>${cats[k] || cap(k)}</span><span><b>${money(left)}</b> ${T('patient.hmo.of', 'of {amount}', { amount: money(c.limits[k]) })}</span></div><div class="meter" role="img" aria-label="${pct}%"><i style="width:${pct}%"></i></div></div>`; })}` : ''}</section>`;
     };
     view(html`${head(T('patient.hmo.title', 'HMO cover'), T('patient.hmo.sub', 'Add your health insurance so providers can bill your HMO directly.'))}
+      <div class="btn-row" style="margin-top:0">${MC.feature('hmoRetail') ? html`<a class="btn primary" href="#/hmo/plans">${icon('plus')}${T('patient.hmo.buy', 'Buy a health plan')}</a>` : ''}<a class="btn" href="#/hmo/cards">${icon('card')}${T('patient.hmo.cards', 'Member cards')}</a><a class="btn" href="#/hmo/requests">${icon('message')}${T('patient.hmo.talk', 'Talk to my HMO')}</a></div>
       ${covs.length ? covs.map(card) : empty({ icon: 'shield', title: T('patient.hmo.none', 'No HMO cover added'), body: T('patient.hmo.none_sub', 'If you have an HMO card from work or a private plan, add it below.') })}
       <form class="panel" data-form="hmo-add" novalidate><h2>${T('patient.hmo.add', 'Add my HMO')}</h2><div id="hmo-list">${MC.skeleton(1)}</div>
         <div class="fields two"><div class="field"><label for="hm-n">${T('patient.hmo.member', 'Member number')}</label><input class="input" id="hm-n" name="memberNo" maxlength="40" required autocapitalize="characters" placeholder="HH-100234"><div class="hint">${T('patient.hmo.member_hint', 'It is on your HMO card.')}</div></div>
@@ -1223,6 +1241,13 @@
     const SEX = [['female', T('patient.sex.female', 'Female')], ['male', T('patient.sex.male', 'Male')], ['other', T('patient.sex.other', 'Other')], ['unknown', T('patient.sex.unknown', 'Prefer not to say')]];
     const PRQ = { delete: T('patient.priv.t.delete', 'Delete my data'), correct: T('patient.priv.t.correct', 'Correct my data'), restrict: T('patient.priv.t.restrict', 'Limit use of my data'), object: T('patient.priv.t.object', 'Object to use of my data') };
     view(html`${head(T('patient.prof.title', 'Profile and settings'))}${MC.wristband(p)}
+      <section class="panel"><h2>${T('patient.prof.nin', 'NIN')}</h2>
+        ${p.ninStatus === 'verified' ? html`<p>${badge(T('patient.prof.nin_ok', 'Confirmed with NIMC'), 'ok')} <span class="muted sm">${T('patient.prof.nin_ends', 'Ends in {d}', { d: p.ninLast4 })}</span></p>`
+          : p.ninStatus === 'pending' ? html`<p>${badge(T('patient.prof.nin_pending', 'Saved, waiting to be confirmed'), 'warn')} <span class="muted sm">${T('patient.prof.nin_ends', 'Ends in {d}', { d: p.ninLast4 })}</span></p>`
+          : html`<div class="notice warn">${T('patient.prof.nin_missing', 'Add your NIN to join providers and HMOs. Your first provider is free.')}</div>
+            <form data-form="nin-add" class="row wrap" style="align-items:flex-end" novalidate><div class="field" style="flex:1;min-width:200px;margin:0"><label for="pf-nin">${T('patient.prof.nin_label', 'NIN (11 digits)')}</label><input class="input" id="pf-nin" name="nin" inputmode="numeric" maxlength="11" autocomplete="off" required></div><button class="btn primary" type="submit">${T('patient.prof.nin_save', 'Confirm my NIN')}</button><div class="form-err notice bad" hidden style="flex-basis:100%"></div></form>`}
+        ${p.uid ? html`<p class="sm" style="margin:8px 0 0">${T('patient.prof.uid', 'Your MediCore patient ID')}: <b><code>${p.uid}</code></b>. ${T('patient.prof.uid_hint', 'One record for life: every hospital, pharmacy, lab and HMO you use finds you with it.')}</p>` : ''}
+        <p class="muted sm" style="margin:8px 0 0">${T('patient.prof.nin_privacy', 'MediCore checks your NIN with a licensed NIMC partner and keeps only a secure fingerprint of it and the last 4 digits.')}</p></section>
       <section class="panel"><h2>${T('patient.prof.allergies', 'Allergies')}</h2>
         ${(p.allergies || []).length ? html`<ul class="list">${p.allergies.map(a => html`<li><div class="grow"><span class="title">${a.substance}</span><span class="sub">${[a.reaction, a.severity && a.severity !== 'unknown' ? T('patient.sev.' + a.severity, cap(a.severity)) : null].filter(Boolean).join(' | ')}</span></div></li>`)}</ul>`
           : p.noKnownAllergies ? html`<p>${T('patient.prof.nka', 'You told us you have no known allergies.')}</p>` : html`<div class="notice warn">${T('patient.prof.allergy_unknown', 'Your allergies are not recorded. Doctors and pharmacists need this to keep you safe.')}</div><button class="btn" data-action="nka">${T('patient.prof.set_nka', 'I have no known allergies')}</button>`}
@@ -1262,6 +1287,7 @@
     try { await api.post('/api/me/providers/' + encodeURIComponent(el.dataset.org) + '/share', { share: on1 }); toast(on1 ? T('patient.prof.share_on', '{org} can now see your history from other providers', { org: el.dataset.name }) : T('patient.prof.share_off', '{org} now sees only its own records', { org: el.dataset.name }), 'ok'); }
     catch (e) { el.checked = !on1; throw e; } finally { el.disabled = false; }
   });
+  form('nin-add', async d => { const n = String(d.nin || '').replace(/\s+/g, ''); if (!/^\d{11}$/.test(n)) throw fail(T('patient.prof.nin_need', 'Type the 11 digits of your NIN'), 'nin'); await api.post('/api/me/nin', { nin: n }); toast(T('patient.prof.nin_saved', 'NIN saved'), 'ok'); MC.render(); });
   on('nka', async () => { await api.patch('/api/me/profile', { noKnownAllergies: true }); toast(T('patient.prof.nka_saved', 'Saved: no known allergies'), 'ok'); MC.render(); });
   on('allergy-add', async () => {
     const v = await dialog({ title: T('patient.prof.add_allergy', 'Add an allergy'), form: true, body: allergyFields('al'),
@@ -1461,6 +1487,10 @@
       ['#/more/appointments', 'calendar', T('patient.nav.appointments', 'Appointments'), T('patient.more.appt', 'Upcoming and past visits, video visits')],
       ['#/more/bills', 'card', T('patient.nav.bills', 'Bills and payments'), isProv() ? T('patient.more.bills_mine', 'Pay your bills') : T('patient.more.bills', 'Pay bills from all your providers')],
       ['#/more/messages', 'message', T('patient.nav.messages', 'Messages'), isProv() ? T('patient.more.msg_mine', 'Write to your doctors and the front desk') : T('patient.more.msg', 'Write to your doctors and providers')],
+      MC.feature('marketplace') ? ['#/market', 'globe', T('patient.nav.market', 'Marketplace'), T('patient.more.market', 'Find any hospital, clinic, pharmacy or lab near you')] : null,
+      MC.feature('careSharing') ? ['#/more/care-team', 'users', T('patient.nav.care_team', 'My care team'), T('patient.more.care_team', 'Providers who look after you together')] : null,
+      MC.feature('documents') ? ['#/more/documents', 'file', T('patient.nav.documents', 'My documents'), T('patient.more.documents', 'Letters, sick notes, forms and old records')] : null,
+      MC.feature('wearables') ? ['#/more/health-devices', 'heart', T('patient.nav.health_devices', 'Health devices'), T('patient.more.health_devices', 'Sync your watch and home devices; share readings with your providers')] : null,
       ['#/more/hmo', 'shield', T('patient.nav.hmo', 'HMO cover'), T('patient.more.hmo', 'Your health insurance and what is left')],
       aiOn() ? ['#/more/assistant', 'heart', T('patient.nav.assistant', 'Health assistant'), T('patient.more.ai', 'Ask about symptoms and medicines')] : null,
       needProvider() ? null : ['#/more/contact', 'phone', isProv() && cur() ? T('patient.contact.card_title', 'Contact {provider}', { provider: curName() }) : T('patient.nav.contact', 'Contact numbers'), T('patient.more.contact', 'Phone and WhatsApp numbers for each department')],
@@ -1471,6 +1501,9 @@
       <div class="btn-row"><button class="btn" data-action="signout">${icon('logout')}${T('kit.signout', 'Sign out')}</button></div>`);
     refreshCounts();
   }
+
+  // the marketplace part (assets/patient-market.js) pays, refreshes and switches providers through these
+  MC.patientApp = { payBill, loadProviders, choose, providers: () => providers(), refreshCounts };
 
   /* ---------------- boot ---------------- */
   const nav = (href, icon1, key, en, extra) => Object.assign({ href, icon: icon1, get label() { return T(key, en); } }, extra || {});
@@ -1486,6 +1519,10 @@
       nav('#/more/appointments', 'calendar', 'patient.nav.appointments', 'Appointments', { sideOnly: true }),
       nav('#/more/bills', 'card', 'patient.nav.bills', 'Bills and payments', { sideOnly: true }),
       nav('#/more/messages', 'message', 'patient.nav.messages', 'Messages', { sideOnly: true }),
+      nav('#/market', 'globe', 'patient.nav.market', 'Marketplace', { sideOnly: true, show: () => MC.feature('marketplace') }),
+      nav('#/more/care-team', 'users', 'patient.nav.care_team', 'My care team', { sideOnly: true, show: () => MC.feature('careSharing') }),
+      nav('#/more/documents', 'file', 'patient.nav.documents', 'My documents', { sideOnly: true, show: () => MC.feature('documents') }),
+      nav('#/more/health-devices', 'heart', 'patient.nav.health_devices', 'Health devices', { sideOnly: true, show: () => MC.feature('wearables') }),
       nav('#/more/hmo', 'shield', 'patient.nav.hmo', 'HMO cover', { sideOnly: true }),
       nav('#/more/assistant', 'heart', 'patient.nav.assistant', 'Health assistant', { sideOnly: true, show: () => aiOn() }),
       nav('#/more/contact', 'phone', 'patient.nav.contact', 'Contact numbers', { sideOnly: true }),
@@ -1501,6 +1538,7 @@
       '#/more/bills': bills, '#/more/messages': messages, '#/more/messages/:id': thread, '#/more/hmo': hmo, '#/more/assistant': assistant,
       '#/more/profile': profile, '#/more/notifications': notifications, '#/more/contact': contactPage,
       '#/more/providers': providersPage, '#/more/join': joinPage, '#/more/referrals': referralsPage,
+      ...MC.pmarket.routes(),
     },
     beforeSignOut: () => { MC.api.header('X-MC-Provider', null); prov.summary = null; prov.current = null; try { localStorage.removeItem('mcp-summary'); } catch (e) { } return true; },
     loginFooter: () => html`<p class="foot">${T('patient.login.new', 'New to MediCore?')} <a href="/register.html#/patient"><b>${T('patient.login.create', 'Create your account')}</b></a></p><p class="foot">${T('patient.login.emergency', 'Emergency? Call 112 or 767 (Lagos).')}</p>`,

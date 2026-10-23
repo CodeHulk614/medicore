@@ -372,6 +372,8 @@
           <div class="field"><label for="rg-s">${T('lab.wi.sex', 'Sex')}</label><select class="input" id="rg-s" name="sex"><option value="unknown">${T('lab.wi.sex_u', 'Not recorded')}</option><option value="female">${T('lab.wi.sex_f', 'Female')}</option><option value="male">${T('lab.wi.sex_m', 'Male')}</option></select></div>
           <div class="field"><label for="rg-a">${T('lab.wi.allergies', 'Allergies (comma separated)')}</label><input class="input" id="rg-a" name="allergies" maxlength="300"></div>
           <label class="check"><input type="checkbox" name="noKnownAllergies"><span>${T('lab.wi.nka', 'No known allergies')}</span></label>
+          <div class="fields two"><div class="field"><label for="wi-nin">${T('lab.wi.nin', 'NIN (11 digits)')}</label><input class="input" id="wi-nin" name="nin" inputmode="numeric" maxlength="11" autocomplete="off"></div>
+          <div class="field"><label for="wi-nonin">${T('lab.wi.no_nin', 'No NIN? Say why')}</label><select class="input" id="wi-nonin" name="noNinReason"><option value="">${T('lab.wi.has_nin', 'The patient has a NIN')}</option><option value="child">${T('lab.wi.nonin_child', 'A child without a NIN yet')}</option><option value="not_enrolled">${T('lab.wi.nonin_ne', 'Not yet enrolled with NIMC')}</option><option value="foreign_national">${T('lab.wi.nonin_f', 'Foreign national')}</option></select></div></div>
           <label class="check"><input type="checkbox" name="consent" required><span>${MC.content('labPrivacyConsent', T('lab.wi.consent', 'The patient has read the privacy notice and agrees to registration.'))}</span></label>
           <div class="form-err notice bad" hidden></div><button class="btn" type="submit">${T('lab.wi.register_btn', 'Register patient')}</button></form></details>` : html`<p class="notice" style="margin-top:12px">${T('lab.wi.no_reg', 'New to this lab? Your role cannot register patients. Ask the front desk to register them, then search again.')}</p>`}`, box);
     };
@@ -393,6 +395,8 @@
       if (!d.consent) throw new MC.ApiError(400, { error: T('lab.wi.need_consent', 'The patient must agree to the privacy notice first') });
       const body = { firstName: d.firstName, lastName: d.lastName, consent: true, sex: d.sex || 'unknown' };
       if (d.phone) body.phone = d.phone; if (d.dob) body.dob = d.dob;
+      const nin = String(d.nin || '').replace(/\s+/g, ''); if (nin) body.nin = nin; else if (d.noNinReason) body.noNinReason = d.noNinReason;
+      else throw new MC.ApiError(400, { error: T('lab.wi.need_nin', 'Type the patient\'s NIN, or choose why they have none') });
       if (d.allergies) body.allergies = d.allergies.split(',').map(x => x.trim()).filter(Boolean).slice(0, 20).map(x => ({ substance: x })); else if (d.noKnownAllergies) body.noKnownAllergies = true;
       const r = await api.post('/api/fd/patients', body); patient = r.patient; toast(T('lab.wi.registered', '{name} registered', { name: patient.name }), 'ok'); paintPt();
     });
@@ -475,8 +479,10 @@
       { href: '#/catalog', label: T('lab.nav.catalog', 'Test catalogue'), short: T('lab.nav.catalog_short', 'Catalogue'), icon: 'clipboard', anyPerm: ['lab.catalog', 'lab.verify'] },
       MC.referrals.navItem(),
       MC.whatsapp.navItem(),
+      MC.caretools.nav.shares({ sideOnly: true }),
+      MC.caretools.nav.store({ sideOnly: true }),
     ],
-    routes: { '#/worklist': worklist, '#/lookup': lookup, '#/order/:id': orderPage, '#/report/:id': reportPage, '#/walkin': walkin, '#/catalog': catalog, ...MC.referrals.routes('#/referrals'), ...MC.whatsapp.routes('#/whatsapp') },
-    onReady: async () => { MC.referrals.refreshCount(); MC.whatsapp.refreshCount(); },
+    routes: { '#/worklist': worklist, '#/lookup': lookup, '#/order/:id': orderPage, '#/report/:id': reportPage, '#/walkin': walkin, '#/catalog': catalog, ...MC.referrals.routes('#/referrals'), ...MC.whatsapp.routes('#/whatsapp'), ...MC.caretools.routes({ patientHref: () => '#/shared-care' }) },
+    onReady: async () => { MC.referrals.refreshCount(); MC.whatsapp.refreshCount(); MC.caretools.refreshCount(); },
   });
 })();

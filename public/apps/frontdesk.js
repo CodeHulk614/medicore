@@ -138,8 +138,9 @@
     const rows = can('patient.read') ? await api.get('/api/fd/patients' + qs({ q: query.q, limit: query.q ? 50 : 15 })) : [];
     view(html`<div class="page-head"><div><h1>${T('find.title', 'Find or register a patient')}</h1><p>${T('find.sub', 'Always look up the phone number first so nobody gets two records.')}</p></div></div>
       <div class="grid two">
-        ${can('patient.register') ? html`<form class="panel" data-form="fd-lookup" novalidate><h2>${T('find.by_phone', 'Look up by phone')}</h2>
-          <div class="field"><label for="lk-ph">${T('find.phone', 'Patient phone number')}</label><input class="input" id="lk-ph" name="phone" inputmode="tel" autocomplete="off" placeholder="0803 123 4567" required></div>
+        ${can('patient.register') ? html`<form class="panel" data-form="fd-lookup" novalidate><h2>${T('find.by_phone_nin', 'Look up by phone or NIN')}</h2>
+          <div class="fields two"><div class="field"><label for="lk-ph">${T('find.phone', 'Patient phone number')}</label><input class="input" id="lk-ph" name="phone" inputmode="tel" autocomplete="off" placeholder="0803 123 4567"></div>
+          <div class="field"><label for="lk-nin">${T('find.nin_any', 'Or NIN, MediCore patient ID or email')}</label><input class="input" id="lk-nin" name="nin" inputmode="numeric" maxlength="11" autocomplete="off"></div></div>
           <div class="form-err notice bad" hidden></div>
           <div class="btn-row"><button class="btn primary" type="submit">${icon('search')}${T('find.lookup', 'Look up phone number')}</button><a class="btn ghost" href="#/register">${T('find.no_phone', 'Register without a phone')}</a></div></form>` : ''}
         ${can('patient.read') ? html`<form class="panel" data-form="fd-search" novalidate><h2>${T('find.search', 'Search our patients')}</h2>
@@ -152,16 +153,20 @@
   }
   form('fd-search', d => MC.go('#/patients' + qs({ q: d.q })));
   form('fd-lookup', async d => {
-    if (!d.phone) throw err400(T('find.need_phone', 'Enter the phone number'), [{ field: 'phone', error: T('find.need_phone', 'Enter the phone number') }]);
-    const r = await api.post('/api/fd/patients/lookup', { phone: d.phone });
+    const other = String(d.nin || '').trim(); const nin = /^\d[\d\s]{9,}$/.test(other) ? other.replace(/\s+/g, '') : '';
+    if (!d.phone && !other) throw err400(T('find.need_phone_nin', 'Enter the phone number or the NIN'), [{ field: 'phone', error: T('find.need_phone_nin', 'Enter the phone number or the NIN') }]);
+    const key = nin ? { nin } : /^MCP-/i.test(other) ? { uid: other.toUpperCase() } : other.includes('@') ? { email: other } : { phone: d.phone };
+    const r = await api.post('/api/fd/patients/lookup', key);
     if (r.status === 'linked') { toast(T('find.found', 'Patient found'), 'ok'); return MC.go('#/patient/' + r.patient.id); }
-    if (r.status === 'new') return MC.go('#/register' + qs({ phone: d.phone }));
+    if (r.status === 'new') return MC.go('#/register' + qs({ phone: d.phone, nin }));
+    const hmoBox = (r.hmo || []).length ? html`<div class="notice">${r.hmo.map(h => html`<div><b>${h.hmoName}</b> ${badge(T('find.hmo_st.' + h.status, cap(h.status)), h.status === 'active' ? 'ok' : 'warn')} ${h.inNetworkHere ? badge(T('find.in_net', 'You are in this HMO\'s network'), 'ok') : badge(T('find.not_net', 'Not in your network'), 'outline')}</div>`)}</div>` : '';
+    if (r.status === 'exists_no_phone') return dialog({ title: T('find.no_phone_t', 'Record without a phone'), body: html`<p>${r.message}</p>${hmoBox}`, actions: [{ label: MC.t('kit.ok', 'OK'), primary: true }] });
     const res = await dialog({ title: T('find.link_t', 'Ask the patient for their code'), form: true,
-      body: html`<p>${r.message || T('find.link_body', 'This person already has a MediCore record. We have sent them a code by SMS.')}</p>
+      body: html`<p>${r.message || T('find.link_body', 'This person already has a MediCore record. We have sent them a code by SMS.')}</p>${hmoBox}
         ${r.devCode ? html`<div class="notice">${MC.t('kit.demo_code', 'Demo mode: your code is')} <b>${r.devCode}</b></div>` : ''}
         <div class="field"><label for="lk-c">${T('find.code', 'Code from the SMS')}</label><input class="input" id="lk-c" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required></div>`,
       actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('find.link_btn', 'Link record'), primary: true }],
-      onSubmit: async f => { if (!f.code) throw err400(T('find.need_code', 'Enter the code the patient received')); return api.post('/api/fd/patients/link', { phone: d.phone, code: f.code }); } });
+      onSubmit: async f => { if (!f.code) throw err400(T('find.need_code', 'Enter the code the patient received')); return api.post('/api/fd/patients/link', Object.assign({ code: f.code }, key)); } });
     if (res && res.patient) { toast(T('find.linked', 'Record linked to your provider'), 'ok'); MC.go('#/patient/' + res.patient.id); }
   });
 
@@ -183,6 +188,8 @@
           <div class="field"><label for="rg-w">${T('reg.weight', 'Weight (kg)')}</label><input class="input" id="rg-w" name="weightKg" type="number" min="0.3" max="400" step="0.1" inputmode="decimal"></div></div>
           <div class="fields two"><div class="field"><label for="rg-ph">${T('reg.phone', 'Phone')}</label><input class="input" id="rg-ph" name="phone" inputmode="tel" value="${query.phone || ''}" autocomplete="off"><div class="hint">${T('reg.phone_hint', 'The patient can later sign up in the MediCore app with this number to see their records.')}</div></div>
           <div class="field"><label for="rg-em">${T('reg.email', 'Email')}</label><input class="input" id="rg-em" name="email" type="email" autocomplete="off"></div></div>
+          <div class="fields two"><div class="field"><label for="rg-nin">${T('reg.nin', 'NIN (11 digits)')}</label><input class="input" id="rg-nin" name="nin" inputmode="numeric" maxlength="11" value="${query.nin || ''}" autocomplete="off"><div class="hint">${T('reg.nin_hint', 'Checked with NIMC. It stops duplicate records and lets HMOs and other providers find the same person.')}</div></div>
+          <div class="field"><label for="rg-nonin">${T('reg.no_nin', 'No NIN? Say why')}</label><select class="input" id="rg-nonin" name="noNinReason"><option value="">${T('reg.has_nin', 'The patient has a NIN')}</option><option value="child">${T('reg.nonin.child', 'A child without a NIN yet')}</option><option value="emergency">${T('reg.nonin.emergency', 'Emergency: add it later')}</option><option value="not_enrolled">${T('reg.nonin.not_enrolled', 'Not yet enrolled with NIMC')}</option><option value="foreign_national">${T('reg.nonin.foreign', 'Foreign national')}</option></select></div></div>
           <div class="field"><label for="rg-ad">${T('reg.address', 'Home address')}</label><input class="input" id="rg-ad" name="address" maxlength="300" autocomplete="off"></div>
           <div class="fields two"><div class="field"><label for="rg-bg">${T('reg.blood', 'Blood group')}</label><select class="input" id="rg-bg" name="bloodGroup"><option value="">${T('reg.not_known', 'Not known')}</option>${BLOOD.map(b => html`<option>${b}</option>`)}</select></div>
           <div class="field"><label for="rg-gt">${T('reg.genotype', 'Genotype')}</label><select class="input" id="rg-gt" name="genotype"><option value="">${T('reg.not_known', 'Not known')}</option>${GENO.map(b => html`<option>${b}</option>`)}</select></div></div>
@@ -221,12 +228,29 @@
     if (!d.allergyStatus) details.push({ field: 'allergyStatus', error: T('reg.need_allergy', 'Choose whether the patient has allergies') });
     if (d.allergyStatus === 'has' && !allergies.length) details.push({ field: 'al_s_0', error: T('reg.need_substance', 'Write what the patient is allergic to') });
     if (!d.consent) details.push({ field: 'consent', error: T('reg.need_consent', 'The patient must agree to the privacy notice') });
+    d.nin = String(d.nin || '').replace(/\s+/g, '');
+    if (d.nin && !/^\d{11}$/.test(d.nin)) details.push({ field: 'nin', error: T('reg.need_nin11', 'A NIN has 11 digits') });
+    if (!d.nin && !d.noNinReason) details.push({ field: 'nin', error: T('reg.need_nin', 'Type the NIN, or choose why the patient has none') });
     if (details.length) throw err400(T('reg.fix', 'Some details are missing. Check the highlighted fields.'), details);
-    const body = { firstName: d.firstName, lastName: d.lastName, dob: d.dob, sex: d.sex, phone: d.phone, email: d.email, address: d.address, bloodGroup: d.bloodGroup, genotype: d.genotype, weightKg: d.weightKg, nokName: d.nokName, nokPhone: d.nokPhone, consent: true,
+    const body = { firstName: d.firstName, lastName: d.lastName, dob: d.dob, sex: d.sex, phone: d.phone, email: d.email, address: d.address, bloodGroup: d.bloodGroup, genotype: d.genotype, weightKg: d.weightKg, nokName: d.nokName, nokPhone: d.nokPhone, consent: true, nin: d.nin || undefined, noNinReason: d.nin ? undefined : d.noNinReason,
       allergies: d.allergyStatus === 'has' ? allergies : [], noKnownAllergies: d.allergyStatus === 'none' };
     const r = await api.post('/api/fd/patients', body);
     toast(T('reg.done', '{name} registered. MRN {mrn}', { name: r.patient.name, mrn: r.patient.mrn }), 'ok');
     MC.go('#/patient/' + r.patient.id);
+  });
+
+  on('pt-hmo-offer', async el => {
+    const r = await api.get('/api/fd/patients/' + el.dataset.id + '/hmo-plans');
+    const plans = []; r.hmos.forEach(h => h.plans.forEach(p => plans.push(Object.assign({ hmoName: h.name }, p))));
+    if (!plans.length) return toast(T('pt.hmo_no_plans', 'No HMO in your network sells plans on MediCore yet'), 'bad');
+    const d = await dialog({ title: T('pt.hmo_offer_t', 'Get this patient insured'), form: true,
+      body: html`<p class="sm">${T('pt.hmo_offer_b', 'Plans from HMOs whose network you are in. The cover starts when the patient pays the premium in the app or here.')}</p>
+        <div class="field"><label for="ho-p">${T('pt.hmo_plan', 'Plan')}</label><select class="input" id="ho-p" name="planId">${plans.map(p => html`<option value="${p.id}">${p.hmoName}: ${p.name} (${money(p.premiumMonthlyKobo)} ${T('pt.hmo_pm', 'a month')})</option>`)}</select></div>
+        <div class="field"><label for="ho-per">${T('pt.hmo_period', 'Pay')}</label><select class="input" id="ho-per" name="period"><option value="monthly">${T('pt.hmo_monthly', 'Monthly')}</option><option value="annual">${T('pt.hmo_annual', 'Yearly')}</option></select></div>
+        <label class="check"><input type="checkbox" name="consent"><span>${T('pt.hmo_consent', 'The patient agrees to the plan terms and to sharing their details with the HMO.')}</span></label>`,
+      actions: [{ label: MC.t('kit.cancel', 'Cancel'), value: null }, { label: T('pt.hmo_enrol', 'Start cover'), primary: true }],
+      onSubmit: f => { if (!f.consent) throw err400(T('pt.hmo_need_consent', 'The patient must agree first')); return api.post('/api/fd/patients/' + el.dataset.id + '/hmo-enrol', { planId: f.planId, period: f.period, consent: true }); } });
+    if (d) { toast(T('pt.hmo_started', 'Cover started: member {n}. It activates when the premium is paid.', { n: d.memberNo }), 'ok'); MC.render(); }
   });
 
   /* ================= patient page ================= */
@@ -241,6 +265,7 @@
       canAny('billing.create', 'billing.cash') ? maybe(api.get('/api/bills' + qs({ patientId: pid, limit: 20 }))) : null,
       maybe(api.get('/api/fd/queue')),
     ]);
+    const hmos = (await maybe(api.get('/api/fd/patients/' + pid + '/hmo-summary'))) || [];
     if (stale()) return;
     const active = (queue || []).filter(q => q.patientId === pid);
     current = { p, appts: appts || [], active };
@@ -253,11 +278,15 @@
           ${can('care.manage') ? html`<button class="btn" data-action="care-new" data-patient="${p.id}" data-name="${p.name}">${icon('message')}${T('pt.case', 'New care case')}</button>` : ''}
           ${MC.referrals.canSend() && MC.feature('referralNetwork') ? html`<button class="btn" data-action="pt-refer">${icon('swap')}${T('pt.refer', 'Refer to another provider')}</button>` : ''}
           ${canAny('patient.register', 'vitals.record') ? html`<button class="btn" data-action="pt-edit">${icon('edit')}${T('pt.edit', 'Edit details')}</button>` : ''}
+          ${MC.caretools.actions(p)}
         </div></div>
       ${active.length ? html`<div class="notice ok">${active.map(q => html`<div>${T('pt.in_queue', 'In the queue: ticket {n} at {sp}', { n: q.number, sp: spLabel(q.servicePoint) })} ${sb(q.status)}</div>`)}</div>` : ''}
       <div class="grid two">
         <div>
           <section class="panel"><h2>${T('pt.details', 'Details')}</h2><dl class="kv">
+            <dt>${T('pt.uid', 'MediCore patient ID')}</dt><dd><code>${p.uid || '-'}</code></dd>
+            <dt>${T('reg.nin_short', 'NIN')}</dt><dd>${p.ninStatus === 'verified' ? html`${badge(T('pt.nin_ok', 'Confirmed'), 'ok')} <span class="muted sm">${T('pt.nin_ends', 'ends in {d}', { d: p.ninLast4 })}</span>` : p.ninStatus === 'pending' ? badge(T('pt.nin_pending', 'Waiting for NIMC check'), 'warn') : p.noNinReason ? badge(T('reg.nonin.' + p.noNinReason, cap(p.noNinReason)), 'outline') : badge(T('pt.nin_missing', 'Not recorded'), 'warn')}</dd>
+            <dt>${T('pt.hmo', 'HMO cover')}</dt><dd>${hmos.length ? hmos.map(h => html`<div><b>${h.hmoName}</b> ${badge(T('find.hmo_st.' + h.status, cap(h.status)), h.status === 'active' ? 'ok' : 'warn')}${h.planName ? ' ' + h.planName : ''}<br><span class="muted sm">${[h.memberNo, h.validTo ? T('pt.hmo_to', 'to {d}', { d: h.validTo }) : '', h.primaryProvider ? T('pt.hmo_primary', 'primary: {p}', { p: h.primaryProvider }) : '', T('pt.hmo_net', '{n} providers in network', { n: h.networkProviders }), h.inNetworkHere ? T('find.in_net', 'You are in this HMO\'s network') : T('find.not_net', 'Not in your network')].filter(Boolean).join(' | ')}</span></div>`) : html`<span class="muted">${T('pt.hmo_none', 'Not insured')}</span>${can('patient.register') && MC.feature('hmoRetail') ? html` <button class="btn sm" data-action="pt-hmo-offer" data-id="${p.id}">${icon('shield')}${T('pt.hmo_offer', 'Offer an HMO plan')}</button>` : ''}`}</dd>
             <dt>${T('reg.dob', 'Date of birth')}</dt><dd>${p.dob ? date(Date.parse(p.dob + 'T12:00:00Z')) + ' (' + ageSex(p) + ')' : '-'}</dd>
             <dt>${T('reg.phone', 'Phone')}</dt><dd>${p.phone || '-'}${p.claimed ? html` ${badge(T('pt.app_user', 'Uses the app'), 'info')}` : ''}</dd>
             <dt>${T('reg.email', 'Email')}</dt><dd>${p.email || '-'}</dd>
@@ -277,8 +306,10 @@
         <div>
           ${can('vitals.record') ? html`<form class="panel" data-form="fd-vitals" novalidate><h2>${T('vitals.record', 'Record vitals')}</h2>${vitalsFields('vt')}<div class="form-err notice bad" hidden></div><button class="btn primary" type="submit">${T('vitals.save', 'Save vitals')}</button></form>` : ''}
           <section class="panel"><h2>${T('vitals.history', 'Vitals history')}</h2>${vitalsTable(vitals || [])}</section>
+          ${MC.caretools.panels(p)}
         </div>
       </div>`);
+    MC.caretools.load(p, stale).catch(() => {});
     if (canAny('hmo.check', 'hmo.claim')) await loadExtHmoBox(p, stale);
   }
   let current = null;
@@ -1111,6 +1142,9 @@
       { href: '#/care', label: T('nav.care', 'Customer care'), short: T('nav.care_short', 'Care'), icon: 'message', perm: 'care.manage' },
       { href: '#/applications', label: T('nav.applications', 'Applications'), short: T('nav.applications_short', 'Joining'), icon: 'clipboard', perm: 'patient.applications' },
       MC.whatsapp.navItem(),
+      MC.caretools.nav.shares({ sideOnly: true }),
+      MC.caretools.nav.transfers(),
+      MC.caretools.nav.store({ sideOnly: true }),
       { href: '#/preauths', label: T('nav.preauths', 'Pre-authorisations'), short: T('nav.preauths_short', 'Pre-auths'), icon: 'shield', anyPerm: ['hmo.check', 'hmo.claim'] },
       { href: '#/claims', label: T('nav.claims', 'HMO claims'), short: T('nav.claims_short', 'Claims'), icon: 'file', perm: 'hmo.claim' },
       { href: '#/incoming', label: T('nav.incoming', 'Incoming'), icon: 'ambulance', anyPerm: ['queue.manage', 'patient.register', 'patient.read'], show: () => incomingOK, sideOnly: true },
@@ -1119,11 +1153,13 @@
       '#/billing': billing, '#/bill/new': billNew, '#/bill/:id': billPage, '#/care': care, '#/care/:id': careCase, '#/incoming': incoming, '#/applications': applications,
       '#/preauths': preauthsPage, '#/claims': claimsPage,
       ...MC.referrals.routes('#/referrals', { patientHref: pid => '#/patient/' + pid }),
-      ...MC.whatsapp.routes('#/whatsapp', { patientHref: pid => '#/patient/' + pid }) },
+      ...MC.whatsapp.routes('#/whatsapp', { patientHref: pid => '#/patient/' + pid }),
+      ...MC.caretools.routes({ patientHref: pid => '#/patient/' + pid }) },
     onReady: async () => {
       doctorsCache = null; hmosCache = null;
       MC.referrals.refreshCount();
       MC.whatsapp.refreshCount();
+      MC.caretools.refreshCount();
       if (can('patient.applications')) api.get('/api/fd/applications' + qs({ status: 'pending', limit: 200 })).then(r => MC.navCount('#/applications', r.length)).catch(() => {});
       try { await api.get('/api/fd/incoming'); incomingOK = true; }
       catch (e) { if (e.status === 404) { incomingOK = false; document.querySelectorAll('[data-nav][href="#/incoming"]').forEach(a => a.remove()); } }
